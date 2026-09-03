@@ -30,6 +30,9 @@
         <a href="index.html" class="nav-btn" target="_blank">
           <i class="fa-solid fa-store"></i> ดูหน้าร้านค้า
         </a>
+        <button class="nav-btn" style="color: var(--danger);" onclick="logoutAdmin()">
+          <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
+        </button>
       </div>
     </div>
   </nav>
@@ -252,6 +255,28 @@
             <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
           </button>
         </div>
+
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
+
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
+          <i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่านเข้าสู่ระบบผู้ขาย/แอดมิน
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+          รหัสผ่านนี้ใช้ป้องกันไม่ให้นักเรียนหรือผู้ซื้อทั่วไปเข้าถึงหน้านี้ (ค่าเริ่มต้น: <code>admin1234</code>)
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">รหัสผ่านใหม่:</label>
+            <input type="password" id="newAdminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านใหม่">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ยืนยันรหัสผ่านใหม่:</label>
+            <input type="password" id="confirmAdminPasswordInput" class="form-input" placeholder="ยืนยันรหัสผ่าน">
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="changeAdminPassword()">
+          <i class="fa-solid fa-shield-halved"></i> บันทึกรหัสผ่านใหม่
+        </button>
       </div>
     </section>
 
@@ -340,6 +365,39 @@
           <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
             <button type="button" class="btn btn-secondary" onclick="closeReplyModal()">ยกเลิก</button>
             <button type="submit" class="btn btn-primary">ส่งคำตอบ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal: Admin Login Gate ==================== -->
+  <div class="modal-overlay" id="adminAuthModal" style="z-index: 99999; backdrop-filter: blur(10px); background: rgba(15, 23, 42, 0.85);">
+    <div class="modal-card" style="max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
+      <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
+        <div class="modal-title" style="color: #fff;">
+          <i class="fa-solid fa-lock"></i> เข้าสู่ระบบเฉพาะครู/ผู้ขาย
+        </div>
+      </div>
+      <div class="modal-body" style="padding: 1.75rem;">
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          หน้านี้สงวนไว้สำหรับครูผู้สอนและผู้ดูแลระบบหมวดการงานอาชีพเท่านั้น กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน
+        </p>
+        <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่าน (ค่าเริ่มต้น: admin1234)" autofocus required>
+          </div>
+          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem; display: none;">
+            <i class="fa-solid fa-circle-exclamation"></i> รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+            <button type="submit" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด
+            </button>
+            <a href="index.html" class="btn btn-secondary btn-block">
+              <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าผู้ซื้อ
+            </a>
           </div>
         </form>
       </div>

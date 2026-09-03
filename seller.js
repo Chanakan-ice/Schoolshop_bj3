@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     apiInput.value = GAS_API_URL;
   }
 
-  refreshAllData();
+  checkAdminAuth();
 });
 
 // ==================== Tab Switching ====================
@@ -551,3 +551,65 @@ function showToast(message, type = "info") {
     setTimeout(() => toast.remove(), 400);
   }, 3500);
 }
+
+// ==================== Admin Authentication ====================
+function checkAdminAuth() {
+  const isAuth = sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
+  const authModal = document.getElementById("adminAuthModal");
+  if (!isAuth) {
+    if (authModal) authModal.classList.add("active");
+  } else {
+    if (authModal) authModal.classList.remove("active");
+    refreshAllData();
+  }
+}
+
+function handleAdminLogin(e) {
+  e.preventDefault();
+  const input = document.getElementById("adminPasswordInput");
+  const errorEl = document.getElementById("authErrorMsg");
+  const currentPassword = localStorage.getItem("CAREER_ADMIN_PASSWORD") || "admin1234";
+
+  if (input.value === currentPassword) {
+    sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
+    document.getElementById("adminAuthModal").classList.remove("active");
+    if (errorEl) errorEl.style.display = "none";
+    showToast("เข้าสู่ระบบสำเร็จ ยินดีต้อนรับครับ", "success");
+    refreshAllData();
+  } else {
+    if (errorEl) errorEl.style.display = "block";
+    input.value = "";
+    input.focus();
+    showToast("รหัสผ่านไม่ถูกต้อง", "error");
+  }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem("CAREER_ADMIN_AUTH");
+  showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
+  window.location.href = "index.html";
+}
+
+function changeAdminPassword() {
+  const newPass = document.getElementById("newAdminPasswordInput").value.trim();
+  const confirmPass = document.getElementById("confirmAdminPasswordInput").value.trim();
+
+  if (!newPass) {
+    showToast("กรุณากรอกรหัสผ่านใหม่", "error");
+    return;
+  }
+  if (newPass.length < 4) {
+    showToast("รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร", "error");
+    return;
+  }
+  if (newPass !== confirmPass) {
+    showToast("รหัสผ่านใหม่และการยืนยันไม่ตรงกัน", "error");
+    return;
+  }
+
+  localStorage.setItem("CAREER_ADMIN_PASSWORD", newPass);
+  document.getElementById("newAdminPasswordInput").value = "";
+  document.getElementById("confirmAdminPasswordInput").value = "";
+  showToast("เปลี่ยนรหัสผ่านแอดมินสำเร็จแล้ว", "success");
+}
+
