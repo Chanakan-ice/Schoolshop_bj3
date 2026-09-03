@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ร้านค้าสหกรณ์โรงเรียน | School Shopping Online</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="logo-icon">
+          <i class="fa-solid fa-school"></i>
+        </div>
+        <div>
+          <span>SchoolShop</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ร้านค้าโรงเรียนออนไลน์</div>
+        </div>
+      </a>
+
+      <div class="nav-links">
+        <button class="nav-btn" onclick="openTrackModal()">
+          <i class="fa-solid fa-truck-fast"></i> ติดตามพัสดุ
+        </button>
+        <button class="nav-btn" onclick="openPreorderModal()">
+          <i class="fa-solid fa-calendar-plus"></i> สั่งจองล่วงหน้า
+        </button>
+        <button class="nav-btn" onclick="openContactModal()">
+          <i class="fa-solid fa-comment-dots"></i> สอบถาม
+        </button>
+        <button class="nav-btn cart-btn" onclick="openCartModal()">
+          <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+        <a href="seller.html" class="nav-btn" title="เข้าสู่ระบบผู้ขาย/แอดมิน">
+          <i class="fa-solid fa-user-shield"></i> ผู้ขาย
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Banner -->
+  <section class="hero">
+    <div class="hero-container">
+      <div class="hero-badge">
+        <i class="fa-solid fa-bolt"></i> ช้อปง่าย รับของไว ชำระเงินปลายทาง (COD)
+      </div>
+      <h1 class="hero-title">ระบบสั่งซื้ออุปกรณ์การเรียน & ของว่างออนไลน์</h1>
+      <p class="hero-subtitle">
+        สั่งซื้อสมุด เครื่องเขียน อุปกรณ์การเรียน และอาหารว่างได้สะดวกรวดเร็ว ไม่ต้องรอคิวหน้าสหกรณ์ รับของที่จุดบริการพร้อมชำระเงินปลายทาง
+      </p>
+
+      <div class="hero-features">
+        <div class="feature-pill">
+          <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
+        </div>
+        <div class="feature-pill">
+          <i class="fa-solid fa-store"></i> รับของที่สหกรณ์หรือหน้าห้องเรียน
+        </div>
+        <div class="feature-pill">
+          <i class="fa-solid fa-bell"></i> เช็กสถานะการเตรียมของแบบเรียลไทม์
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    
+    <!-- Controls (Search & Category Filters) -->
+    <section class="controls-section">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาชื่อสินค้า เช่น สมุด, ปากกา, แซนด์วิช...">
+      </div>
+
+      <div class="category-pills" id="categoryContainer">
+        <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
+        <button class="cat-pill" data-cat="สมุด/เครื่องเขียน">สมุด / เครื่องเขียน</button>
+        <button class="cat-pill" data-cat="อุปกรณ์การเรียน">อุปกรณ์การเรียน</button>
+        <button class="cat-pill" data-cat="เครื่องแต่งกาย">เครื่องแต่งกาย / เข็ม</button>
+        <button class="cat-pill" data-cat="ของว่าง/เครื่องดื่ม">ของว่าง / เครื่องดื่ม</button>
+      </div>
+    </section>
+
+    <!-- Product Grid -->
+    <section>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.35rem; color: var(--text-main); font-weight: 600;">
+          <i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้า
+        </h2>
+        <span id="productCount" style="font-size: 0.9rem; color: var(--text-muted);">กำลังโหลดสินค้า...</span>
+      </div>
+
+      <div class="products-grid" id="productsGrid">
+        <!-- Products will be injected by app.js -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== Modals ==================== -->
+
+  <!-- 1. Cart Modal -->
+  <div class="modal-overlay" id="cartModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-cart-shopping"></i> ตะกร้าสินค้าของคุณ
+        </div>
+        <button class="close-btn" onclick="closeCartModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="cartItemsList" class="cart-items-list">
+          <!-- Injected via JavaScript -->
+        </div>
+
+        <div class="cart-summary">
+          <span>ยอดรวมทั้งหมด:</span>
+          <span id="cartTotalPrice" style="color: var(--primary);">0 ฿</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCartModal()">เลือกซื้อต่อ</button>
+        <button class="btn btn-primary" id="checkoutBtn" onclick="openCheckoutModal()">
+          สั่งซื้อเลย (COD) <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Checkout Modal -->
+  <div class="modal-overlay" id="checkoutModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-clipboard-check"></i> ยืนยันการสั่งซื้อ (COD)
+        </div>
+        <button class="close-btn" onclick="closeCheckoutModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="orderForm" onsubmit="handleOrderSubmit(event)">
+          
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ-นามสกุล นักเรียน *</label>
+            <input type="text" id="custName" class="form-input" placeholder="เช่น ด.ช.สมชาย ใจดี" required>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-graduation-cap"></i> ระดับชั้น *</label>
+              <select id="custClass" class="form-select" required>
+                <option value="ม.1">ม.1</option>
+                <option value="ม.2">ม.2</option>
+                <option value="ม.3">ม.3</option>
+                <option value="ม.4">ม.4</option>
+                <option value="ม.5">ม.5</option>
+                <option value="ม.6">ม.6</option>
+                <option value="คุณครู/บุคลากร">คุณครู/บุคลากร</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ห้อง *</label>
+              <input type="text" id="custRoom" class="form-input" placeholder="เช่น 2, 4" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">เลขที่ *</label>
+              <input type="number" id="custNo" class="form-input" placeholder="เช่น 15" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-phone"></i> เบอร์โทรศัพท์ *</label>
+              <input type="tel" id="custPhone" class="form-input" placeholder="เช่น 0812345678" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของ</label>
+              <select id="custLocation" class="form-select">
+                <option value="หน้าร้านค้าสหกรณ์">หน้าร้านค้าสหกรณ์</option>
+                <option value="ห้องเรียน (ช่วงพักกลางวัน)">ห้องเรียน (ช่วงพักกลางวัน)</option>
+                <option value="จุดบริการหน้าเสาธง">จุดบริการหน้าเสาธง</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-pen-to-square"></i> หมายเหตุเพิ่มเติม</label>
+            <input type="text" id="custNote" class="form-input" placeholder="เช่น ขอรับของก่อนเที่ยง">
+          </div>
+
+          <!-- COD Notice -->
+          <div class="cod-badge">
+            <i class="fa-solid fa-hand-holding-dollar" style="font-size: 1.5rem;"></i>
+            <div>
+              <strong>วิธีชำระเงิน: เก็บเงินปลายทาง (Cash on Delivery)</strong>
+              <div style="font-size: 0.8rem; margin-top: 2px;">
+                เตรียมเงินสดให้พอดีเมื่อมารับสินค้า ณ จุดนัดรับที่เลือกไว้
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0; margin-top: 1.25rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeCheckoutModal()">ย้อนกลับ</button>
+            <button type="submit" class="btn btn-primary" id="submitOrderBtn">
+              <i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Tracking Modal -->
+  <div class="modal-overlay" id="trackModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-magnifying-glass-location"></i> ตรวจสอบสถานะคำสั่งซื้อ
+        </div>
+        <button class="close-btn" onclick="closeTrackModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">กรอกเบอร์โทร หรือ ชื่อนักเรียน หรือ รหัสคำสั่งซื้อ:</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="trackQueryInput" class="form-input" placeholder="เช่น 0812345678 หรือ สมชาย">
+            <button class="btn btn-primary" onclick="searchOrders()">ค้นหา</button>
+          </div>
+        </div>
+
+        <div id="trackResultList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Results injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Preorder Modal -->
+  <div class="modal-overlay" id="preorderModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้าล่วงหน้า (Pre-order)
+        </div>
+        <button class="close-btn" onclick="closePreorderModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="preorderForm" onsubmit="handlePreorderSubmit(event)">
+          <div class="form-group">
+            <label class="form-label">ชื่อสินค้าที่ต้องการสั่งจอง *</label>
+            <input type="text" id="preProdName" class="form-input" placeholder="เช่น เสื้อพละเบอร์ L, เข็มกลัดรุ่นพิเศษ" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">จำนวนที่ต้องการ *</label>
+              <input type="number" id="preProdQty" class="form-input" min="1" value="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">วันที่ต้องการรับของโดยประมาณ</label>
+              <input type="date" id="preProdDate" class="form-input">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">ชื่อ-นามสกุล นักเรียน *</label>
+            <input type="text" id="preCustName" class="form-input" placeholder="ด.ช.สมชาย ใจดี" required>
+          </div>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label class="form-label">ชั้น</label>
+              <select id="preCustClass" class="form-select">
+                <option value="ม.1">ม.1</option>
+                <option value="ม.2">ม.2</option>
+                <option value="ม.3">ม.3</option>
+                <option value="ม.4">ม.4</option>
+                <option value="ม.5">ม.5</option>
+                <option value="ม.6">ม.6</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ห้อง</label>
+              <input type="text" id="preCustRoom" class="form-input" placeholder="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">เบอร์โทรศัพท์ *</label>
+              <input type="tel" id="preCustPhone" class="form-input" placeholder="0812345678" required>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closePreorderModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">ส่งรายการจอง</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Contact / Question Modal -->
+  <div class="modal-overlay" id="contactModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-comment-dots"></i> สอบถาม / ส่งข้อความถึงร้านค้า
+        </div>
+        <button class="close-btn" onclick="closeContactModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="contactForm" onsubmit="handleContactSubmit(event)">
+          <div class="form-group">
+            <label class="form-label">ชื่อผู้สอบถาม *</label>
+            <input type="text" id="msgName" class="form-input" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ห้องเรียน / ติดต่อกลับ</label>
+            <input type="text" id="msgRoom" class="form-input" placeholder="เช่น ม.2/3 หรือ เบอร์โทร">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ข้อความ / คำถาม *</label>
+            <textarea id="msgContent" class="form-textarea" rows="4" placeholder="พิมพ์ข้อความหรือสอบถามสินค้าที่ต้องการ..." required></textarea>
+          </div>
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeContactModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">ส่งข้อความ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <p style="font-weight: 600; color: var(--primary-dark);">🏫 ระบบร้านค้าสหกรณ์โรงเรียนออนไลน์ (School Shopping App)</p>
+      <p>ระบบบันทึกข้อมูลผ่าน Google Sheets & Google Apps Script API | Vercel Deployment</p>
+      <p style="font-size: 0.8rem; color: var(--text-light);">© 2026 SchoolShop. พัฒนาเพื่อการเรียนรู้และอำนวยความสะดวกในโรงเรียน</p>
+    </div>
+  </footer>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>

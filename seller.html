@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจัดการร้านค้าสหกรณ์ | Seller Admin Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="seller.html" class="brand-logo">
+        <div class="logo-icon" style="background: linear-gradient(135deg, #0c4a6e, #0284c7);">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div>
+          <span>Seller Admin</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ระบบจัดการร้านค้าโรงเรียน</div>
+        </div>
+      </a>
+
+      <div class="nav-links">
+        <button class="nav-btn" onclick="refreshAllData()">
+          <i class="fa-solid fa-arrows-rotate"></i> รีเฟรชข้อมูล
+        </button>
+        <a href="index.html" class="nav-btn" target="_blank">
+          <i class="fa-solid fa-store"></i> ดูหน้าร้านค้า
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Dashboard Container -->
+  <main class="main-content">
+
+    <!-- KPI Summary Metrics -->
+    <div class="dashboard-metrics">
+      <div class="metric-card">
+        <div class="metric-icon blue">
+          <i class="fa-solid fa-bag-shopping"></i>
+        </div>
+        <div class="metric-info">
+          <h3 id="statTotalOrders">0</h3>
+          <p>คำสั่งซื้อทั้งหมด</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon amber">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="metric-info">
+          <h3 id="statPendingOrders">0</h3>
+          <p>รอดำเนินการ / จัดเตรียม</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon green">
+          <i class="fa-solid fa-sack-dollar"></i>
+        </div>
+        <div class="metric-info">
+          <h3 id="statTotalRevenue">0 ฿</h3>
+          <p>ยอดขายรวม (COD)</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon red">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="metric-info">
+          <h3 id="statLowStock">0</h3>
+          <p>สินค้าสต็อกเหลือน้อย</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="dashboard-tabs">
+      <button class="dash-tab active" onclick="switchTab('ordersTab', this)">
+        <i class="fa-solid fa-receipt"></i> จัดการคำสั่งซื้อ (Orders)
+      </button>
+      <button class="dash-tab" onclick="switchTab('productsTab', this)">
+        <i class="fa-solid fa-boxes-stacked"></i> จัดการสินค้าและสต็อก (Products)
+      </button>
+      <button class="dash-tab" onclick="switchTab('preordersTab', this)">
+        <i class="fa-solid fa-calendar-check"></i> รายการสั่งจอง (Pre-orders)
+      </button>
+      <button class="dash-tab" onclick="switchTab('messagesTab', this)">
+        <i class="fa-solid fa-comments"></i> ข้อความสอบถาม (Messages)
+      </button>
+      <button class="dash-tab" onclick="switchTab('settingsTab', this)">
+        <i class="fa-solid fa-gear"></i> ตั้งค่า API (Settings)
+      </button>
+    </div>
+
+    <!-- ==================== TAB 1: Orders ==================== -->
+    <section id="ordersTab" class="tab-pane">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+        <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-clipboard-list" style="color: var(--primary);"></i> รายการคำสั่งซื้อทั้งหมด</h2>
+        <div style="display: flex; gap: 0.5rem;">
+          <select id="orderFilterStatus" class="form-select" style="width: auto; padding: 0.4rem 0.8rem;" onchange="filterOrders()">
+            <option value="all">ทุกสถานะ</option>
+            <option value="รอดำเนินการ">รอดำเนินการ</option>
+            <option value="กำลังจัดเตรียม">กำลังจัดเตรียม</option>
+            <option value="พร้อมรับของ">พร้อมรับของ</option>
+            <option value="สำเร็จ">สำเร็จ (รับของแล้ว)</option>
+            <option value="ยกเลิก">ยกเลิก</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รหัสคำสั่งซื้อ</th>
+              <th>เวลาที่สั่ง</th>
+              <th>ข้อมูลนักเรียน</th>
+              <th>รายการสินค้า</th>
+              <th>ยอดรวม (COD)</th>
+              <th>จุดนัดรับ</th>
+              <th>สถานะคำสั่งซื้อ</th>
+              <th>การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดข้อมูลคำสั่งซื้อ...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: Products ==================== -->
+    <section id="productsTab" class="tab-pane" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้าในระบบ</h2>
+        <button class="btn btn-primary" onclick="openAddProductModal()">
+          <i class="fa-solid fa-plus"></i> เพิ่มสินค้าใหม่
+        </button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รหัส</th>
+              <th>รูปภาพ</th>
+              <th>ชื่อสินค้า</th>
+              <th>หมวดหมู่</th>
+              <th>ราคา (บาท)</th>
+              <th>สต็อกคงเหลือ</th>
+              <th>การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody">
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดรายการสินค้า...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: Pre-orders ==================== -->
+    <section id="preordersTab" class="tab-pane" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i> รายการสั่งจองล่วงหน้า</h2>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รหัสจอง</th>
+              <th>วันที่จอง</th>
+              <th>ชื่อนักเรียน</th>
+              <th>เบอร์โทร</th>
+              <th>สินค้าที่จอง</th>
+              <th>จำนวน</th>
+              <th>วันที่ต้องการรับ</th>
+              <th>สถานะ</th>
+              <th>เปลี่ยนสถานะ</th>
+            </tr>
+          </thead>
+          <tbody id="preordersTableBody">
+            <tr>
+              <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดรายการสั่งจอง...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: Messages ==================== -->
+    <section id="messagesTab" class="tab-pane" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-inbox" style="color: var(--primary);"></i> ข้อความสอบถามจากนักเรียน</h2>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>รหัส</th>
+              <th>เวลา</th>
+              <th>ชื่อผู้ส่ง</th>
+              <th>ห้องเรียน / ติดต่อ</th>
+              <th>ข้อความ</th>
+              <th>การตอบกลับ</th>
+              <th>สถานะ</th>
+              <th>การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="messagesTableBody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดข้อความ...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: Settings ==================== -->
+    <section id="settingsTab" class="tab-pane" style="display: none;">
+      <div style="max-width: 700px; background: var(--bg-card); padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: var(--primary-dark);">
+          <i class="fa-solid fa-link"></i> ตั้งค่าการเชื่อมต่อ Google Apps Script API
+        </h2>
+        
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+          นำ Web App URL ที่ได้จากการกด <strong>Deploy > New deployment</strong> บน Google Apps Script มาใส่ที่นี่ เพื่อให้ระบบเชื่อมต่อไปยัง Google Sheets ฐานข้อมูลจริง
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Google Apps Script Web App URL:</label>
+          <input type="url" id="apiUrlInput" class="form-input" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button class="btn btn-primary" onclick="saveApiUrl()">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
+          </button>
+          <button class="btn btn-secondary" onclick="testApiConnection()">
+            <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== Modal: Add / Edit Product ==================== -->
+  <div class="modal-overlay" id="productModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="productModalTitle">
+          <i class="fa-solid fa-box-open"></i> เพิ่มสินค้าใหม่
+        </div>
+        <button class="close-btn" onclick="closeProductModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm" onsubmit="handleProductFormSubmit(event)">
+          <input type="hidden" id="editProductId">
+
+          <div class="form-group">
+            <label class="form-label">ชื่อสินค้า *</label>
+            <input type="text" id="prodNameInput" class="form-input" placeholder="เช่น ปากกาเจลสีแดง" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">หมวดหมู่ *</label>
+              <select id="prodCatInput" class="form-select" required>
+                <option value="สมุด/เครื่องเขียน">สมุด/เครื่องเขียน</option>
+                <option value="อุปกรณ์การเรียน">อุปกรณ์การเรียน</option>
+                <option value="เครื่องแต่งกาย">เครื่องแต่งกาย</option>
+                <option value="ของว่าง/เครื่องดื่ม">ของว่าง/เครื่องดื่ม</option>
+                <option value="ทั่วไป">ทั่วไป</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ราคา (บาท) *</label>
+              <input type="number" id="prodPriceInput" class="form-input" min="1" placeholder="20" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">จำนวนสต็อก *</label>
+              <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="50" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ลิงก์รูปภาพ (URL)</label>
+              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">คำอธิบายสินค้า</label>
+            <textarea id="prodDescInput" class="form-textarea" rows="3" placeholder="รายละเอียดคุณสมบัติสินค้า..."></textarea>
+          </div>
+
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeProductModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary" id="saveProductBtn">บันทึกสินค้า</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal: Reply Message ==================== -->
+  <div class="modal-overlay" id="replyModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-reply"></i> ตอบกลับข้อความ
+        </div>
+        <button class="close-btn" onclick="closeReplyModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="replyForm" onsubmit="handleReplySubmit(event)">
+          <input type="hidden" id="replyMessageId">
+          <div class="form-group">
+            <label class="form-label">ข้อความจากนักเรียน:</label>
+            <div id="replyOriginalMsg" style="background: #f1f5f9; padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.9rem;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ข้อความตอบกลับ *</label>
+            <textarea id="replyTextInput" class="form-textarea" rows="3" placeholder="พิมพ์ข้อความตอบกลับที่นี่..." required></textarea>
+          </div>
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeReplyModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">ส่งคำตอบ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="seller.js"></script>
+</body>
+</html>
