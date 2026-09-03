@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ร้านค้าสหกรณ์โรงเรียน | School Shopping Online</title>
+  <title>ร้านค้าหมวดการงานอาชีพ | Career & Occupations Shop</title>
   <link rel="stylesheet" href="styles.css">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,11 +15,11 @@
     <div class="nav-container">
       <a href="index.html" class="brand-logo">
         <div class="logo-icon">
-          <i class="fa-solid fa-school"></i>
+          <i class="fa-solid fa-seedling"></i>
         </div>
         <div>
-          <span>SchoolShop</span>
-          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ร้านค้าโรงเรียนออนไลน์</div>
+          <span>CareerShop</span>
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ร้านค้าหมวดการงานอาชีพ</div>
         </div>
       </a>
 
@@ -37,8 +37,8 @@
           <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
           <span class="cart-count" id="cartCount">0</span>
         </button>
-        <a href="seller.html" class="nav-btn" title="เข้าสู่ระบบผู้ขาย/แอดมิน">
-          <i class="fa-solid fa-user-shield"></i> ผู้ขาย
+        <a href="seller.html" class="nav-btn" title="เข้าสู่ระบบผู้ขาย/แอดมินหมวดการงาน">
+          <i class="fa-solid fa-user-shield"></i> ผู้ขาย/ครูผู้ดูแล
         </a>
       </div>
     </div>
@@ -48,11 +48,11 @@
   <section class="hero">
     <div class="hero-container">
       <div class="hero-badge">
-        <i class="fa-solid fa-bolt"></i> ช้อปง่าย รับของไว ชำระเงินปลายทาง (COD)
+        <i class="fa-solid fa-leaf"></i> สั่งซื้อผลงาน & ผลผลิตฝีมือนักเรียน ชำระเงินปลายทาง (COD)
       </div>
-      <h1 class="hero-title">ระบบสั่งซื้ออุปกรณ์การเรียน & ของว่างออนไลน์</h1>
+      <h1 class="hero-title">ร้านค้าจำหน่ายผลงาน & ผลิตภัณฑ์หมวดการงานอาชีพ</h1>
       <p class="hero-subtitle">
-        สั่งซื้อสมุด เครื่องเขียน อุปกรณ์การเรียน และอาหารว่างได้สะดวกรวดเร็ว ไม่ต้องรอคิวหน้าสหกรณ์ รับของที่จุดบริการพร้อมชำระเงินปลายทาง
+        สนับสนุนผลงานฝีมือนักเรียน ทั้งเบเกอรี่ ขนม อาหาร ผลผลิตเกษตรอินทรีย์ งานประดิษฐ์ งานช่าง และวัสดุอุปกรณ์สำหรับวิชาการงานอาชีพ รับของสะดวกพร้อมชำระเงินปลายทาง
       </p>
 
       <div class="hero-features">
@@ -60,10 +60,10 @@
           <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
         </div>
         <div class="feature-pill">
-          <i class="fa-solid fa-store"></i> รับของที่สหกรณ์หรือหน้าห้องเรียน
+          <i class="fa-solid fa-door-open"></i> รับของที่ห้องหมวดการงานหรือห้องเรียน
         </div>
         <div class="feature-pill">
-          <i class="fa-solid fa-bell"></i> เช็กสถานะการเตรียมของแบบเรียลไทม์
+          <i class="fa-solid fa-star"></i> ผลงานฝีมือนักเรียน สดใหม่ ปลอดภัย
         </div>
       </div>
     </div>
@@ -76,15 +76,15 @@
     <section class="controls-section">
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-        <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาชื่อสินค้า เช่น สมุด, ปากกา, แซนด์วิช...">
+        <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาผลงาน เช่น คุกกี้, ผักสลัด, กระเป๋าผ้า, งานไม้, ชุดอุปกรณ์...">
       </div>
 
       <div class="category-pills" id="categoryContainer">
         <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
-        <button class="cat-pill" data-cat="สมุด/เครื่องเขียน">สมุด / เครื่องเขียน</button>
-        <button class="cat-pill" data-cat="อุปกรณ์การเรียน">อุปกรณ์การเรียน</button>
-        <button class="cat-pill" data-cat="เครื่องแต่งกาย">เครื่องแต่งกาย / เข็ม</button>
-        <button class="cat-pill" data-cat="ของว่าง/เครื่องดื่ม">ของว่าง / เครื่องดื่ม</button>
+        <button class="cat-pill" data-cat="งานคหกรรม/เบเกอรี่">งานคหกรรม / เบเกอรี่</button>
+        <button class="cat-pill" data-cat="งานเกษตร/ผลผลิต">งานเกษตร / ผลผลิต</button>
+        <button class="cat-pill" data-cat="งานช่าง/งานประดิษฐ์">งานช่าง / งานประดิษฐ์</button>
+        <button class="cat-pill" data-cat="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</button>
       </div>
     </section>
 
@@ -182,9 +182,10 @@
             <div class="form-group">
               <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของ</label>
               <select id="custLocation" class="form-select">
-                <option value="หน้าร้านค้าสหกรณ์">หน้าร้านค้าสหกรณ์</option>
+                <option value="ห้องพักครูหมวดการงานอาชีพ">ห้องพักครูหมวดการงานอาชีพ</option>
+                <option value="ห้องปฏิบัติการคหกรรม/ทำอาหาร">ห้องปฏิบัติการคหกรรม/ทำอาหาร</option>
+                <option value="แปลงเกษตรโรงเรียน">แปลงเกษตรโรงเรียน</option>
                 <option value="ห้องเรียน (ช่วงพักกลางวัน)">ห้องเรียน (ช่วงพักกลางวัน)</option>
-                <option value="จุดบริการหน้าเสาธง">จุดบริการหน้าเสาธง</option>
               </select>
             </div>
           </div>
@@ -339,9 +340,9 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="footer-content">
-      <p style="font-weight: 600; color: var(--primary-dark);">🏫 ระบบร้านค้าสหกรณ์โรงเรียนออนไลน์ (School Shopping App)</p>
-      <p>ระบบบันทึกข้อมูลผ่าน Google Sheets & Google Apps Script API | Vercel Deployment</p>
-      <p style="font-size: 0.8rem; color: var(--text-light);">© 2026 SchoolShop. พัฒนาเพื่อการเรียนรู้และอำนวยความสะดวกในโรงเรียน</p>
+      <p style="font-weight: 600; color: var(--primary-dark);">🌱 ระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ (CareerShop)</p>
+      <p>จำหน่ายผลผลิต งานฝีมือ และอุปกรณ์การเรียน | สนับสนุนการเรียนรู้และทักษะอาชีพนักเรียน</p>
+      <p style="font-size: 0.8rem; color: var(--text-light);">© 2026 CareerShop. กลุ่มสาระการเรียนรู้การงานอาชีพ</p>
     </div>
   </footer>
 

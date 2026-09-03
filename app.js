@@ -8,61 +8,61 @@
 // URL สำหรับเชื่อมต่อ Google Apps Script Web API (สามารถเปลี่ยนผ่าน Seller Dashboard ได้)
 let GAS_API_URL = localStorage.getItem("SCHOOLSHOP_API_URL") || "";
 
-// ข้อมูลจำลองเริ่มต้น (Mock Data) กรณีที่ยังไม่ได้เชื่อมต่อ Google Sheets API
+// ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ
 const DEFAULT_PRODUCTS = [
   {
     id: "P001",
-    name: "สมุดกราฟ ตราโรงเรียน",
-    category: "สมุด/เครื่องเขียน",
-    price: 25,
-    stock: 50,
-    description: "สมุดกราฟตัดเส้นชัดเจน ขนาด B5 เหมาะสำหรับวิชาคณิตศาสตร์และศิลปะ",
-    image_url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=60"
+    name: "คุกกี้เนยสด ช็อกโกแลตชิพ (ฝีมือนักเรียน)",
+    category: "งานคหกรรม/เบเกอรี่",
+    price: 35,
+    stock: 30,
+    description: "คุกกี้หอมเนยแท้ กรอบอร่อย ผลงานนักเรียนแผนกคหกรรม อบสดใหม่ทุกวัน",
+    image_url: "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=500&auto=format&fit=crop&q=60"
   },
   {
     id: "P002",
-    name: "ปากกาน้ำเงินเจล 0.5 mm",
-    category: "สมุด/เครื่องเขียน",
-    price: 15,
-    stock: 100,
-    description: "หมึกเจลแห้งไว เขียนลื่น ด้ามจับกระชับมือ ไม่เลอะเปื้อน",
-    image_url: "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=500&auto=format&fit=crop&q=60"
+    name: "ผักสลัดไฮโดรโปนิกส์ ปลอดสารเคมี",
+    category: "งานเกษตร/ผลผลิต",
+    price: 30,
+    stock: 25,
+    description: "ผักสลัดกรีนโอ๊ค-เรดโอ๊ค สด กรอบ สะอาด ปลูกโดยนักเรียนชมรมเกษตรอินทรีย์",
+    image_url: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60"
   },
   {
     id: "P003",
-    name: "ชุดเรขาคณิต ครบเซ็ต 4 ชิ้น",
-    category: "อุปกรณ์การเรียน",
-    price: 45,
-    stock: 30,
-    description: "ประกอบด้วย ไม้บรรทัด 15cm, ไม้ครึ่งวงกลม, ไม้ฉาก 45 และ 60 องศา",
-    image_url: "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=500&auto=format&fit=crop&q=60"
+    name: "กระเป๋าผ้ารักษ์โลก ลายเพ้นท์แฮนด์เมด",
+    category: "งานช่าง/งานประดิษฐ์",
+    price: 79,
+    stock: 15,
+    description: "กระเป๋าผ้าแคนวาสอย่างดี เพ้นท์ลายศิลปะประดิษฐ์ใบต่อใบ มีเอกลักษณ์ไม่ซ้ำใคร",
+    image_url: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=500&auto=format&fit=crop&q=60"
   },
   {
     id: "P004",
-    name: "เข็มกลัดตราโรงเรียน (โลหะ)",
-    category: "เครื่องแต่งกาย",
-    price: 50,
+    name: "น้ำอัญชันมะนาว สดชื่น (ขวด 250ml)",
+    category: "งานคหกรรม/เบเกอรี่",
+    price: 15,
     stock: 40,
-    description: "เข็มกลัดตราโรงเรียนมาตรฐาน เคลือบเงาสวยงาม ไม่ลอก ไม่ขึ้นสนิม",
-    image_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60"
+    description: "น้ำสมุนไพรต้มสด หวานอมเปรี้ยว สดชื่น ดับกระหาย จากแปลงสมุนไพรโรงเรียน",
+    image_url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60"
   },
   {
     id: "P005",
-    name: "แซนด์วิชทูน่า-ไข่ดาว สดใหม่",
-    category: "ของว่าง/เครื่องดื่ม",
-    price: 30,
+    name: "ที่รองแก้วไม้สัก ฉลุลายประดิษฐ์",
+    category: "งานช่าง/งานประดิษฐ์",
+    price: 45,
     stock: 20,
-    description: "แซนด์วิชไส้แน่น ทำสดใหม่ทุกเช้า อิ่มอร่อยพร้อมเรียน",
-    image_url: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=500&auto=format&fit=crop&q=60"
+    description: "ผลงานจากห้องปฏิบัติการงานช่าง ขัดเรียบ เคลือบเงากันน้ำ สวยงามทนทาน",
+    image_url: "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&auto=format&fit=crop&q=60"
   },
   {
     id: "P006",
-    name: "นมสดรสจืด ตราโรงเรียน 200ml",
-    category: "ของว่าง/เครื่องดื่ม",
-    price: 12,
-    stock: 60,
-    description: "นมโคแท้ 100% แคลเซียมสูง เย็นสดชื่นพร้อมดื่ม",
-    image_url: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=500&auto=format&fit=crop&q=60"
+    name: "ชุดอุปกรณ์ตัดเย็บเบื้องต้น (พกพา)",
+    category: "อุปกรณ์การเรียนการงาน",
+    price: 55,
+    stock: 30,
+    description: "ประกอบด้วย กรรไกรตัดด้าย เข็ม ด้ายหลากสี สายวัด และที่เลาะ สำหรับวิชาการงาน",
+    image_url: "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60"
   }
 ];
 
@@ -120,10 +120,18 @@ async function loadProducts() {
     }
   }
 
-  // Fallback to local / mock products
+  // Fallback to local / mock products (ตรวจเช็กและอัปเดตหากเป็นข้อมูลสหกรณ์แบบเดิม)
   const localSavedProducts = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
   if (localSavedProducts) {
-    products = JSON.parse(localSavedProducts);
+    const parsed = JSON.parse(localSavedProducts);
+    // หากพบหมวดหมู่เดิม ให้รีเฟรชเป็นหมวดการงานอาชีพ
+    const hasOldCategories = parsed.some(p => p.category === "สมุด/เครื่องเขียน" || p.category === "ของว่าง/เครื่องดื่ม");
+    if (hasOldCategories) {
+      products = DEFAULT_PRODUCTS;
+      localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
+    } else {
+      products = parsed;
+    }
   } else {
     products = DEFAULT_PRODUCTS;
     localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
@@ -478,7 +486,7 @@ async function searchOrders() {
         </div>
         <div style="font-size: 0.85rem; color: var(--text-muted);">
           <div>ผู้สั่ง: <strong>${order.student_name}</strong> (ชั้น ${order.student_class}/${order.student_room})</div>
-          <div>จุดรับของ: ${order.pickup_location || 'สหกรณ์โรงเรียน'}</div>
+          <div>จุดรับของ: ${order.pickup_location || 'ห้องพักครูหมวดการงานอาชีพ'}</div>
           <div>ยอดชำระ (COD): <strong style="color: var(--primary);">${Number(order.total_price).toLocaleString()} ฿</strong></div>
         </div>
       </div>

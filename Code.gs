@@ -36,14 +36,14 @@ function setupDatabase() {
     ]);
     prodSheet.getRange(1, 1, 1, 8).setFontWeight("bold").setBackground("#e0f2fe");
 
-    // ข้อมูลสินค้าตัวอย่าง
+    // ข้อมูลสินค้าตัวอย่าง (หมวดการงานอาชีพ)
     const sampleProducts = [
-      ["P001", "สมุดกราฟ ตราโรงเรียน", "สมุด/เครื่องเขียน", 25, 50, "สมุดกราฟตัดเส้นชัดเจน ขนาด B5 เหมาะสำหรับวิชาคณิตศาสตร์", "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=60", "true"],
-      ["P002", "ปากกาน้ำเงินเจล 0.5 mm", "สมุด/เครื่องเขียน", 15, 100, "หมึกเจลแห้งไว เขียนลื่น ไม่สะดุด", "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=500&auto=format&fit=crop&q=60", "true"],
-      ["P003", "ชุดเรขาคณิต ครบเซ็ต 4 ชิ้น", "อุปกรณ์การเรียน", 45, 30, "ประกอบด้วย ไม้บรรทัด ไม้ครึ่งวงกลม ไม้ฉาก 45 และ 60 องศา", "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=500&auto=format&fit=crop&q=60", "true"],
-      ["P004", "เข็มกลัดตราโรงเรียน (แบบโลหะ)", "เครื่องแต่งกาย", 50, 40, "เข็มกลัดตราโรงเรียนมาตรฐาน เคลือบเงาสวยงาม ไม่ลอกง่าย", "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60", "true"],
-      ["P005", "แซนด์วิชทูน่า-ไข่ดาว", "ของว่าง/เครื่องดื่ม", 30, 20, "ทำสดใหม่ทุกเช้า อิ่มอร่อยก่อนเริ่มเรียน", "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=500&auto=format&fit=crop&q=60", "true"],
-      ["P006", "นมสดรสจืด ตราโรงเรียน 200ml", "ของว่าง/เครื่องดื่ม", 12, 60, "แคลเซียมสูง เย็นสดชื่น", "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=500&auto=format&fit=crop&q=60", "true"]
+      ["P001", "คุกกี้เนยสด ช็อกโกแลตชิพ (ฝีมือนักเรียน)", "งานคหกรรม/เบเกอรี่", 35, 30, "คุกกี้หอมเนยแท้ กรอบอร่อย ผลงานนักเรียนแผนกคหกรรม อบสดใหม่ทุกวัน", "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=500&auto=format&fit=crop&q=60", "true"],
+      ["P002", "ผักสลัดไฮโดรโปนิกส์ ปลอดสารเคมี", "งานเกษตร/ผลผลิต", 30, 25, "ผักสลัดกรีนโอ๊ค-เรดโอ๊ค สด กรอบ สะอาด ปลูกโดยนักเรียนชมรมเกษตรอินทรีย์", "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60", "true"],
+      ["P003", "กระเป๋าผ้ารักษ์โลก ลายเพ้นท์แฮนด์เมด", "งานช่าง/งานประดิษฐ์", 79, 15, "กระเป๋าผ้าแคนวาสอย่างดี เพ้นท์ลายศิลปะประดิษฐ์ใบต่อใบ มีเอกลักษณ์ไม่ซ้ำใคร", "https://images.unsplash.com/photo-1544816155-12df9643f363?w=500&auto=format&fit=crop&q=60", "true"],
+      ["P004", "น้ำอัญชันมะนาว สดชื่น (ขวด 250ml)", "งานคหกรรม/เบเกอรี่", 15, 40, "น้ำสมุนไพรต้มสด หวานอมเปรี้ยว สดชื่น ดับกระหาย จากแปลงสมุนไพรโรงเรียน", "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60", "true"],
+      ["P005", "ที่รองแก้วไม้สัก ฉลุลายประดิษฐ์", "งานช่าง/งานประดิษฐ์", 45, 20, "ผลงานจากห้องปฏิบัติการงานช่าง ขัดเรียบ เคลือบเงากันน้ำ สวยงามทนทาน", "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&auto=format&fit=crop&q=60", "true"],
+      ["P006", "ชุดอุปกรณ์ตัดเย็บเบื้องต้น (พกพา)", "อุปกรณ์การเรียนการงาน", 55, 30, "ประกอบด้วย กรรไกรตัดด้าย เข็ม ด้ายหลากสี สายวัด และที่เลาะ สำหรับวิชาการงาน", "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60", "true"]
     ];
     sampleProducts.forEach(row => prodSheet.appendRow(row));
   }
@@ -328,7 +328,7 @@ function createOrder(ss, orderData) {
     orderData.student_room || "",
     orderData.student_no || "",
     orderData.phone || "",
-    orderData.pickup_location || "หน้าร้านค้าสหกรณ์โรงเรียน",
+    orderData.pickup_location || "ห้องพักครูหมวดการงานอาชีพ",
     itemsJson,
     Number(orderData.total_price) || 0,
     "Cash on Delivery (COD)",
