@@ -551,6 +551,32 @@ function getAdminEmails(customEmails) {
 }
 
 /**
+ * ส่งอีเมลพร้อมตั้งค่าชื่อผู้ส่ง (Sender Name) และ Reply-To เป็น schoolshop.bj3@gmail.com
+ */
+function dispatchEmail(mailDetails) {
+  const options = {
+    to: mailDetails.to,
+    subject: mailDetails.subject,
+    body: mailDetails.body,
+    htmlBody: mailDetails.htmlBody,
+    name: "ร้านค้าหมวดการงานอาชีพ (SchoolShop)",
+    replyTo: "schoolshop.bj3@gmail.com"
+  };
+
+  // หากบัญชีที่ Deploy มีการตั้งค่า Alias schoolshop.bj3@gmail.com ให้ส่งในนามอีเมลนี้
+  try {
+    const aliases = GmailApp.getAliases();
+    if (aliases && aliases.indexOf("schoolshop.bj3@gmail.com") !== -1) {
+      options.from = "schoolshop.bj3@gmail.com";
+    }
+  } catch (e) {
+    Logger.log("Alias check: " + e);
+  }
+
+  MailApp.sendEmail(options);
+}
+
+/**
  * ส่งอีเมลไปยังรายชื่อผู้รับทั้งหมด
  */
 function sendEmailToRecipients(emailList, subject, plainText, htmlBody) {
@@ -561,7 +587,7 @@ function sendEmailToRecipients(emailList, subject, plainText, htmlBody) {
 
   const toAddress = emailList.join(", ");
   try {
-    MailApp.sendEmail({
+    dispatchEmail({
       to: toAddress,
       subject: subject,
       body: plainText,
@@ -610,7 +636,7 @@ function testEmailNotification(customEmails) {
   const plainText = "✅ ทดสอบระบบแจ้งเตือนร้านค้าหมวดการงานอาชีพสำเร็จเรียบร้อย! ระบบอีเมลพร้อมใช้งานแล้วครับ ส่งไปยัง: " + toAddress;
 
   try {
-    MailApp.sendEmail({
+    dispatchEmail({
       to: toAddress,
       subject: subject,
       body: plainText,
