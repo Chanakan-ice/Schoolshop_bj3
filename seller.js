@@ -6,6 +6,7 @@
  */
 
 var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
+var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
   let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
@@ -39,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const emailInput = document.getElementById("adminEmailsInput");
   if (emailInput) {
-    emailInput.value = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "";
+    emailInput.value = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL;
   }
 
   // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
@@ -869,7 +870,7 @@ function saveEmailSettings() {
 
 async function testEmailNotification() {
   const input = document.getElementById("adminEmailsInput");
-  const emails = input ? input.value.trim() : (localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "");
+  const emails = (input && input.value.trim()) ? input.value.trim() : (localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL);
 
   if (!emails) {
     showToast("กรุณาระบุที่อยู่อีเมลของคุณครูก่อนกดทดสอบครับ", "error");

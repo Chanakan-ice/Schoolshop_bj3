@@ -7,6 +7,7 @@
 
 // URL สำหรับเชื่อมต่อ Google Apps Script Web API (ผูกกับ Google Sheets อัตโนมัติ)
 var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
+var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
   let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
@@ -502,7 +503,7 @@ async function handleOrderSubmit(e) {
   }
 
   // แนบอีเมลและ Token ผู้ขายเพื่อส่งแจ้งเตือน
-  orderData.admin_emails = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "";
+  orderData.admin_emails = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL;
   orderData.seller_token = localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "";
 
   try {
@@ -792,7 +793,7 @@ async function handlePreorderSubmit(e) {
     delivery_date: "รอคุณครูกำหนดวัน",
     note: note,
     seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "",
-    admin_emails: localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || ""
+    admin_emails: localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL
   };
 
   let preId = "PRE-" + Date.now().toString().slice(-6);

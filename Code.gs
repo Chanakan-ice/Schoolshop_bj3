@@ -536,7 +536,7 @@ function saveEmailSettingsToProperties(emails) {
  */
 function getAdminEmails(customEmails) {
   const scriptProps = PropertiesService.getScriptProperties();
-  const rawEmails = customEmails || scriptProps.getProperty("ADMIN_EMAILS") || scriptProps.getProperty("SELLER_EMAILS") || "";
+  const rawEmails = customEmails || scriptProps.getProperty("ADMIN_EMAILS") || scriptProps.getProperty("SELLER_EMAILS") || "schoolshop.bj3@gmail.com";
   
   const emailList = String(rawEmails)
     .split(/[,;\n]+/)
@@ -544,13 +544,7 @@ function getAdminEmails(customEmails) {
     .filter(e => e.includes("@") && e.includes("."));
 
   if (emailList.length === 0) {
-    // หากไม่ได้ตั้งค่าไว้ ให้ใช้อีเมลของเจ้าของ Google Account ที่รันสคริปต์
-    try {
-      const ownerEmail = Session.getEffectiveUser().getEmail();
-      if (ownerEmail && ownerEmail.includes("@")) {
-        emailList.push(ownerEmail);
-      }
-    } catch (e) {}
+    emailList.push("schoolshop.bj3@gmail.com");
   }
 
   return emailList;
