@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ร้านค้าหมวดการงานอาชีพ | Career & Occupations Shop</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.0">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -40,9 +40,6 @@
           <button class="nav-btn cart-btn" onclick="openCartModal()">
             <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
             <span class="cart-count" id="cartCount">0</span>
-          </button>
-          <button class="nav-btn" onclick="openAdminAuthModal()" style="border-color: rgba(2, 132, 199, 0.4); color: var(--primary); font-weight: 600;" title="เข้าสู่ระบบผู้ขาย (คุณครู/แอดมิน)">
-            <i class="fa-solid fa-user-shield"></i> ครู / ผู้ขาย
           </button>
         </div>
       </div>
@@ -115,7 +112,7 @@
         <p>จำหน่ายผลผลิต งานฝีมือ และอุปกรณ์การเรียน | สนับสนุนการเรียนรู้และทักษะอาชีพนักเรียน</p>
         <div style="margin-top: 0.5rem;">
           <button class="btn btn-secondary" onclick="openAdminAuthModal()" style="font-size: 0.85rem; padding: 0.4rem 0.9rem;">
-            <i class="fa-solid fa-lock"></i> เข้าสู่ระบบคุณครู / ผู้ดูแลระบบ
+            <i class="fa-solid fa-gear"></i> จัดการร้านค้า (เฉพาะแอดมินหลังร้าน)
           </button>
         </div>
         <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">© 2026 CareerShop. กลุ่มสาระการเรียนรู้การงานอาชีพ</p>
@@ -842,13 +839,14 @@
     <div class="modal-card" id="adminAuthCard" style="max-width: 440px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
       <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
         <div class="modal-title" style="color: #fff;">
-          <i class="fa-solid fa-lock"></i> เข้าสู่ระบบเฉพาะครู/ผู้ขาย
+          <i class="fa-solid fa-shield-halved"></i> ระบบหลังร้าน (เฉพาะแอดมินผู้ดูแลร้านค้า)
         </div>
         <button class="close-btn" style="color: #fff;" onclick="closeAdminAuthModal()">&times;</button>
       </div>
       <div class="modal-body" style="padding: 1.75rem;">
         <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
-          หน้าระบบจัดการร้านค้าสงวนไว้สำหรับครูผู้สอนและผู้ดูแลระบบหมวดการงานอาชีพเท่านั้น กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน
+          หน้านี้สำหรับ<strong>ครูผู้ดูแลระบบร้านค้าหมวดการงานอาชีพ</strong> เพื่อจัดการสต็อกและดูรายการสั่งซื้อเท่านั้น<br>
+          <span style="color: var(--primary); font-weight: 500;">(หากท่านต้องการสั่งซื้อหรือสั่งจองสินค้าในฐานะนักเรียนหรือคุณครู สามารถกดปิดหน้าต่างนี้เพื่อสั่งซื้อได้ทันทีครับ)</span>
         </p>
         <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
           <div class="form-group">
@@ -1017,7 +1015,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts: Load seller.js first so its functions are available, then app.js -->
-  <script src="seller.js"></script>
-  <script src="app.js"></script>
+  <script src="seller.js?v=2.0"></script>
+  <script src="app.js?v=2.0"></script>
 </body>
 </html>

@@ -4,9 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบจัดการร้านค้าหมวดการงานอาชีพ | Career Admin Dashboard</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.0">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    // หากเปิดหน้านี้โดยยังไม่ได้ล็อกอิน ให้พาไปหน้าร้านค้า index.html ทันที
+    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") !== "true" && sessionStorage.getItem("CAREER_ADMIN_AUTH") !== "true") {
+      window.location.replace("index.html");
+    }
+  </script>
 </head>
 <body>
 
@@ -455,12 +461,14 @@
     <div class="modal-card" id="adminAuthCard" style="max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
       <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
         <div class="modal-title" style="color: #fff;">
-          <i class="fa-solid fa-lock"></i> เข้าสู่ระบบเฉพาะครู/ผู้ขาย
+          <i class="fa-solid fa-shield-halved"></i> ระบบหลังร้าน (เฉพาะแอดมินผู้ดูแลระบบ)
         </div>
+        <a href="index.html" class="close-btn" style="color: #fff; text-decoration: none; font-size: 1.5rem; line-height: 1;">&times;</a>
       </div>
       <div class="modal-body" style="padding: 1.75rem;">
-        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-          หน้านี้สงวนไว้สำหรับครูผู้สอนและผู้ดูแลระบบหมวดการงานอาชีพเท่านั้น กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
+          หน้านี้สงวนไว้สำหรับครูผู้สอนและผู้ดูแลระบบหมวดการงานอาชีพเพื่อจัดการสต็อกสินค้าเท่านั้น<br>
+          <span style="color: var(--primary); font-weight: 500;">(หากท่านต้องการสั่งซื้อหรือสั่งจองสินค้า กรุณากดปุ่ม "กลับหน้าร้านค้าผู้ซื้อ" ด้านล่างครับ)</span>
         </p>
         <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
           <div class="form-group">
@@ -475,7 +483,7 @@
               <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด
             </button>
             <a href="index.html" class="btn btn-secondary btn-block">
-              <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าผู้ซื้อ
+              <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าสำหรับสั่งซื้อสินค้า
             </a>
           </div>
         </form>
@@ -487,6 +495,6 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="seller.js"></script>
+  <script src="seller.js?v=2.0"></script>
 </body>
 </html>
