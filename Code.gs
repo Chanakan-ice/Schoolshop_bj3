@@ -195,6 +195,12 @@ function doPost(e) {
       case "testLineNotify":
         return jsonResponse(testLineNotification(data.tokens || data.seller_token));
 
+      case "testLineMessaging":
+        return jsonResponse(testLineMessagingApi(data.channel_access_token, data.user_ids));
+
+      case "saveLineSettings":
+        return jsonResponse(saveLineSettingsToProperties(data.channel_access_token, data.user_ids));
+
       default:
         return jsonResponse({ success: false, message: "Unknown POST action: " + action });
     }
@@ -487,71 +493,178 @@ function updatePreorderStatus(ss, preorderId, newStatus) {
   return { success: false, message: "Preorder not found" };
 }
 
-function notifySellerNewPreorder(data, preId) {
+/**
+ * บันทึกการตั้งค่า LINE Messaging API ลง Script Properties ใน Google Apps Script
+ */
+function saveLineSettingsToProperties(token, userIds) {
   const scriptProps = PropertiesService.getScriptProperties();
-  const rawTokens = scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || data.seller_token || "";
+  if (token) {
+    scriptProps.setProperty("LINE_CHANNEL_ACCESS_TOKEN", String(token).trim());
+  }
+  if (userIds !== undefined) {
+    scriptProps.setProperty("LINE_USER_IDS", String(userIds).trim());
+  }
+  return { success: true, message: "บันทึกการตั้งค่า LINE Messaging API สำเร็จแล้ว" };
+}
 
-  if (!rawTokens) return;
+/**
+ * ฟังก์ชันหลักในการส่งข้อความผ่าน LINE Messaging API
+ * รองรับทั้ง Push (1 คน), Multicast (หลายคน), และ Broadcast (ทุกคนที่เป็นเพื่อนกับบอท)
+ */
+function sendLineMessagingApi(messageText, customToken, customUserIds) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const token = customToken || scriptProps.getProperty("LINE_CHANNEL_ACCESS_TOKEN") || scriptProps.getProperty("LINE_ACCESS_TOKEN") || "";
+  const rawUsers = customUserIds || scriptProps.getProperty("LINE_USER_IDS") || scriptProps.getProperty("LINE_ADMIN_USER_IDS") || scriptProps.getProperty("LINE_DESTINATION_IDS") || "";
 
-  const tokens = String(rawTokens).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
-  if (tokens.length === 0) return;
+  if (!token) {
+    return { success: false, message: "ไม่พบ LINE Channel Access Token" };
+  }
 
+  const userIds = String(rawUsers).split(/[,;\n]+/).map(u => u.trim()).filter(u => u.length > 0);
+
+  const payloadMessage = {
+    type: "text",
+    text: messageText
+  };
+
+  try {
+    let url = "";
+    let payload = {};
+
+    if (userIds.length === 1) {
+      // 1 คน: Push Message
+      url = "https://api.line.me/v2/bot/message/push";
+      payload = {
+        to: userIds[0],
+        messages: [payloadMessage]
+      };
+    } else if (userIds.length > 1) {
+      // หลายคน: Multicast Message
+      url = "https://api.line.me/v2/bot/message/multicast";
+      payload = {
+        to: userIds,
+        messages: [payloadMessage]
+      };
+    } else {
+      // ไม่ได้ระบุ User ID: Broadcast Message
+      url = "https://api.line.me/v2/bot/message/broadcast";
+      payload = {
+        messages: [payloadMessage]
+      };
+    }
+
+    const res = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const statusCode = res.getResponseCode();
+    const responseText = res.getContentText();
+
+    if (statusCode === 200) {
+      return { success: true, message: "ส่งข้อความผ่าน LINE Messaging API สำเร็จ" };
+    } else {
+      Logger.log("LINE Messaging API Error (" + statusCode + "): " + responseText);
+      return { success: false, statusCode: statusCode, message: responseText };
+    }
+  } catch (err) {
+    Logger.log("sendLineMessagingApi Exception: " + err);
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * ทดสอบส่งแจ้งเตือนผ่าน LINE Messaging API
+ */
+function testLineMessagingApi(customToken, customUserIds) {
+  const testMsg = "✅ ทดสอบการเชื่อมต่อระบบแจ้งเตือนร้านค้าหมวดการงานอาชีพผ่าน LINE Messaging API สำเร็จเรียบร้อย!";
+  const result = sendLineMessagingApi(testMsg, customToken, customUserIds);
+  if (result.success) {
+    return { success: true, message: "ส่งข้อความทดสอบเข้า LINE ผ่าน Messaging API สำเร็จเรียบร้อยแล้ว!" };
+  } else {
+    return {
+      success: false,
+      message: "ส่งข้อความไม่สำเร็จ: " + (result.message || result.error || "กรุณาตรวจสอบ Channel Access Token และ User ID")
+    };
+  }
+}
+
+/**
+ * แจ้งเตือนผู้ขายเมื่อมีรายการสั่งจองใหม่ (Pre-order)
+ */
+function notifySellerNewPreorder(data, preId) {
   const buyerInfo = (data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher")
     ? `คุณครู ${data.student_name} (${data.department || data.student_class || 'หมวดการงานฯ'})`
     : `${data.student_name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
 
-  const msg = `\n🔔 มีรายการสั่งจองสินค้าใหม่ (หมวดการงานอาชีพ)!\nรหัส: ${preId}\nสินค้า: ${data.product_name} (${data.quantity} ชิ้น)\nผู้จอง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || '-'}\nช่องทางแจ้งเตือน: ${data.notify_channel} (${data.notify_account})\nหมายเหตุ: ${data.note || '-'}`;
+  const msg = `🔔 มีรายการสั่งจองสินค้าใหม่ (หมวดการงานอาชีพ)!\nรหัส: ${preId}\nสินค้า: ${data.product_name} (${data.quantity} ชิ้น)\nผู้จอง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || '-'}\nช่องทางแจ้งเตือน: ${data.notify_channel} (${data.notify_account})\nหมายเหตุ: ${data.note || '-'}`;
 
-  tokens.forEach(token => {
-    try {
-      UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
-        method: "post",
-        headers: { "Authorization": "Bearer " + token },
-        payload: { "message": msg },
-        muteHttpExceptions: true
-      });
-    } catch (err) {
-      Logger.log("Notify preorder error for token: " + err);
-    }
-  });
+  // 1. ลองส่งผ่าน LINE Messaging API
+  const apiResult = sendLineMessagingApi(msg, data.line_token, data.line_user_ids);
+  if (apiResult && apiResult.success) return;
+
+  // 2. หากยังไม่ได้ตั้ง LINE Messaging API ให้ fallback ไป LINE Notify เดิม
+  notifyViaLineNotify(msg, data.seller_token);
 }
 
+/**
+ * แจ้งเตือนผู้ขายเมื่อมีคำสั่งซื้อใหม่ (COD Order)
+ */
 function notifySellerNewOrder(data, orderId) {
-  const scriptProps = PropertiesService.getScriptProperties();
-  const rawTokens = scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || data.seller_token || "";
-
-  if (!rawTokens) return;
-
-  const tokens = String(rawTokens).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
-  if (tokens.length === 0) return;
-
   const isTeacher = data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher";
   const buyerInfo = isTeacher
     ? `คุณครู ${data.student_name || data.name} (${data.department || 'ไม่ระบุกลุ่มสาระ'})`
     : `${data.student_name || data.name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
 
-  const msg = `\n🛒 มีคำสั่งซื้อใหม่ (COD หมวดการงานอาชีพ)!\nรหัส: ${orderId}\nผู้สั่ง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || 'ห้องพักครู'}\nยอดรวม: ${data.total_price} บาท\nหมายเหตุ: ${data.note || '-'}`;
+  const msg = `🛒 มีคำสั่งซื้อใหม่ (COD หมวดการงานอาชีพ)!\nรหัส: ${orderId}\nผู้สั่ง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || 'ห้องพักครู'}\nยอดรวม: ${data.total_price} บาท\nหมายเหตุ: ${data.note || '-'}`;
 
+  // 1. ลองส่งผ่าน LINE Messaging API
+  const apiResult = sendLineMessagingApi(msg, data.line_token, data.line_user_ids);
+  if (apiResult && apiResult.success) return;
+
+  // 2. Fallback ไปยัง LINE Notify เดิม
+  notifyViaLineNotify(msg, data.seller_token);
+}
+
+/**
+ * Helper ส่งผ่าน LINE Notify เดิม (เผื่อกรณีที่ยังไม่ได้ย้าย)
+ */
+function notifyViaLineNotify(messageText, customTokens) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const rawTokens = customTokens || scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || "";
+  if (!rawTokens) return;
+
+  const tokens = String(rawTokens).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
   tokens.forEach(token => {
     try {
       UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
         method: "post",
         headers: { "Authorization": "Bearer " + token },
-        payload: { "message": msg },
+        payload: { "message": "\n" + messageText },
         muteHttpExceptions: true
       });
     } catch (err) {
-      Logger.log("Notify order error for token: " + err);
+      Logger.log("Notify error for token: " + err);
     }
   });
 }
 
 function testLineNotification(rawTokens) {
+  // หากมี LINE Messaging API Token ให้ทดสอบผ่าน Messaging API ก่อน
   const scriptProps = PropertiesService.getScriptProperties();
-  const tokensStr = rawTokens || scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || "";
+  const msgToken = scriptProps.getProperty("LINE_CHANNEL_ACCESS_TOKEN");
+  if (msgToken) {
+    return testLineMessagingApi(msgToken, scriptProps.getProperty("LINE_USER_IDS"));
+  }
 
+  const tokensStr = rawTokens || scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || "";
   if (!tokensStr) {
-    return { success: false, message: "ไม่พบ LINE Notify Token ในระบบ กรุณาระบุ Token ก่อนทดสอบ" };
+    return { success: false, message: "ไม่พบการตั้งค่า LINE Token ในระบบ กรุณาระบุ Token ก่อนทดสอบ" };
   }
 
   const tokens = String(tokensStr).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);

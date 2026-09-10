@@ -26,6 +26,15 @@ document.addEventListener("DOMContentLoaded", () => {
     tokenInput.value = savedToken;
   }
 
+  const lineTokenInput = document.getElementById("lineChannelAccessTokenInput");
+  const lineUsersInput = document.getElementById("lineUserIdsInput");
+  if (lineTokenInput) {
+    lineTokenInput.value = localStorage.getItem("LINE_CHANNEL_ACCESS_TOKEN") || "";
+  }
+  if (lineUsersInput) {
+    lineUsersInput.value = localStorage.getItem("LINE_USER_IDS") || "";
+  }
+
   // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
   if (window.location.pathname.endsWith("seller.html") || window.location.search.includes("view=seller")) {
     checkAdminAuth();
@@ -807,6 +816,75 @@ function changeAdminPassword() {
   document.getElementById("newAdminPasswordInput").value = "";
   document.getElementById("confirmAdminPasswordInput").value = "";
   showToast("เปลี่ยนรหัสผ่านแอดมินสำเร็จแล้ว", "success");
+}
+
+function saveLineMessagingSettings() {
+  const token = document.getElementById("lineChannelAccessTokenInput") ? document.getElementById("lineChannelAccessTokenInput").value.trim() : "";
+  const userIds = document.getElementById("lineUserIdsInput") ? document.getElementById("lineUserIdsInput").value.trim() : "";
+
+  localStorage.setItem("LINE_CHANNEL_ACCESS_TOKEN", token);
+  localStorage.setItem("LINE_USER_IDS", userIds);
+
+  if (GAS_API_URL && token) {
+    fetch(GAS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "saveLineSettings",
+        channel_access_token: token,
+        user_ids: userIds
+      })
+    }).then(res => res.json()).then(json => {
+      if (json.success) {
+        showToast("บันทึกการตั้งค่า LINE Messaging API ไปยังเซิร์ฟเวอร์เรียบร้อยแล้ว", "success");
+      }
+    }).catch(e => console.warn("Sync line settings err:", e));
+  }
+
+  showToast("บันทึกการตั้งค่า LINE Messaging API เรียบร้อยแล้ว", "success");
+}
+
+async function testLineMessagingApi() {
+  const tokenInput = document.getElementById("lineChannelAccessTokenInput");
+  const usersInput = document.getElementById("lineUserIdsInput");
+
+  const token = tokenInput ? tokenInput.value.trim() : (localStorage.getItem("LINE_CHANNEL_ACCESS_TOKEN") || "");
+  const userIds = usersInput ? usersInput.value.trim() : (localStorage.getItem("LINE_USER_IDS") || "");
+
+  if (!token) {
+    showToast("กรุณาระบุ LINE Channel Access Token ก่อนกดทดสอบครับ", "error");
+    return;
+  }
+
+  showToast("กำลังส่งข้อความทดสอบผ่าน LINE Messaging API...", "info");
+
+  if (GAS_API_URL) {
+    try {
+      const res = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "testLineMessaging",
+          channel_access_token: token,
+          user_ids: userIds
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ ${json.message}`, "success");
+        return;
+      } else {
+        showToast(`⚠️ ${json.message || 'ส่งทดสอบล้มเหลว'}`, "error");
+        return;
+      }
+    } catch (e) {
+      console.warn("Test LINE API error:", e);
+      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์", "error");
+      return;
+    }
+  }
+
+  showToast("บันทึกข้อมูลเรียบร้อยแล้ว (จะส่งผ่าน GAS เมื่อเชื่อมต่อ Web App URL)", "info");
 }
 
 function saveSellerNotifyToken() {

@@ -270,23 +270,45 @@
         <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
 
         <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
-          <i class="fa-brands fa-line" style="color: #06c755;"></i> ตั้งค่า LINE Notify แจ้งเตือนครู/แอดมิน (ส่งได้หลายคนพร้อมกัน)
+          <i class="fa-brands fa-line" style="color: #06c755;"></i> ตั้งค่า LINE Messaging API แจ้งเตือนแอดมิน (LINE Official Account / Bot)
         </h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-          ใส่ LINE Notify Token ของคุณครูแต่ละท่าน เพื่อรับข้อความแจ้งเตือนเข้า LINE ทันทีที่มีการสั่งซื้อหรือสั่งจองสินค้าใหม่ (สามารถใส่ได้หลายคน โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่)
+          ระบบส่งข้อความแจ้งเตือนคำสั่งซื้อและการสั่งจองผ่าน <strong>LINE Messaging API</strong> (ระบบมาตรฐานใหม่ ทดแทน LINE Notify ที่กำลังยุติบริการ)
         </p>
+
         <div class="form-group">
-          <label class="form-label">LINE Notify Tokens (ใส่หลายคนได้):</label>
-          <textarea id="sellerNotifyTokenInput" class="form-textarea" rows="3" placeholder="เช่น&#10;token_ครูA, token_ครูB&#10;token_ครูC"></textarea>
+          <label class="form-label"><i class="fa-solid fa-key"></i> LINE Channel Access Token (Long-lived) *:</label>
+          <textarea id="lineChannelAccessTokenInput" class="form-textarea" rows="2" placeholder="วาง Channel Access Token จาก LINE Developers (เช่น eK...ยาวประมาณ 170+ ตัวอักษร)"></textarea>
         </div>
+
+        <div class="form-group">
+          <label class="form-label"><i class="fa-solid fa-users"></i> LINE User ID หรือ Group ID ผู้รับแจ้งเตือน (ใส่หลายคนได้):</label>
+          <textarea id="lineUserIdsInput" class="form-textarea" rows="2" placeholder="เช่น&#10;Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (User ID ของครู A)&#10;Uyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy (User ID ของครู B)&#10;หรือ Group ID Cxxxxxxxx... (หากดึงบอทเข้ากลุ่มไลน์คุณครู)"></textarea>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            * ใส่ User ID (ขึ้นต้นด้วย <code>U</code>) หรือ Group ID (ขึ้นต้นด้วย <code>C</code>) โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่ (หากเว้นว่างไว้ ระบบจะส่งแบบ Broadcast ไปยังผู้ติดตามบอททุกคน)
+          </div>
+        </div>
+
         <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
-          <button class="btn btn-primary" onclick="saveSellerNotifyToken()">
-            <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่าแจ้งเตือน
+          <button class="btn btn-primary" onclick="saveLineMessagingSettings()">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า LINE API
           </button>
-          <button class="btn btn-secondary" onclick="testSellerLineTokens()">
-            <i class="fa-brands fa-line" style="color: #06c755;"></i> ทดสอบส่งแจ้งเตือนทุก LINE Token
+          <button class="btn btn-secondary" onclick="testLineMessagingApi()">
+            <i class="fa-brands fa-line" style="color: #06c755;"></i> ทดสอบส่งแจ้งเตือน LINE Messaging API
           </button>
         </div>
+
+        <details style="margin-top: 1.25rem; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted);">
+          <summary style="font-weight: 600; cursor: pointer; color: var(--text-main);">
+            <i class="fa-solid fa-circle-question"></i> วิธีขอ Channel Access Token และ User ID ใน 3 นาที
+          </summary>
+          <ol style="margin-top: 0.5rem; padding-left: 1.25rem; line-height: 1.6;">
+            <li>เข้าเว็บ <a href="https://developers.line.biz/" target="_blank" style="color: var(--primary);">LINE Developers Console</a> แล้วล็อกอินด้วยบัญชี LINE</li>
+            <li>สร้าง <strong>Provider</strong> (เช่น หมวดการงานอาชีพ) และสร้าง <strong>Channel: Messaging API</strong></li>
+            <li>ไปที่แท็บ <strong>Messaging API</strong> เลื่อนลงล่างสุดตรง <em>Channel access token (long-lived)</em> กดปุ่ม <strong>Issue</strong> เพื่อคัดลอก Token</li>
+            <li>ดูรหัส <strong>Your user ID</strong> (รหัส U...) ในหน้า Console เดียวกัน แล้วนำมากรอกด้านบน พร้อมทั้งสแกน QR Code เพื่อเพิ่มบอทเป็นเพื่อนใน LINE</li>
+          </ol>
+        </details>
 
         <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
 
