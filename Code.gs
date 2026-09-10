@@ -137,6 +137,9 @@ function doGet(e) {
         const query = e.parameter.query || "";
         return jsonResponse(trackOrders(ss, query));
 
+      case "setupDatabase":
+        return jsonResponse(setupDatabase());
+
       default:
         return jsonResponse({ success: false, message: "Invalid action" });
     }

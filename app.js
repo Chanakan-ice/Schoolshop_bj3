@@ -5,8 +5,9 @@
  * ==============================================================================
  */
 
-// URL สำหรับเชื่อมต่อ Google Apps Script Web API (สามารถเปลี่ยนผ่าน Seller Dashboard ได้)
-var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+// URL สำหรับเชื่อมต่อ Google Apps Script Web API (ผูกกับ Google Sheets อัตโนมัติ)
+var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
+var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_GAS_URL;
 window.GAS_API_URL = GAS_API_URL;
 
 // ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ

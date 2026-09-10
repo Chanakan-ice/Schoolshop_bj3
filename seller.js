@@ -5,7 +5,8 @@
  * ==============================================================================
  */
 
-var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
+var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_GAS_URL;
 window.GAS_API_URL = GAS_API_URL;
 
 // State
