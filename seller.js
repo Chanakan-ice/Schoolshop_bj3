@@ -5,13 +5,14 @@
  * ==============================================================================
  */
 
-let GAS_API_URL = localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+window.GAS_API_URL = GAS_API_URL;
 
 // State
-let allOrders = [];
-let allProducts = [];
-let allPreorders = [];
-let allMessages = [];
+var allOrders = window.allOrders || [];
+var allProducts = window.allProducts || [];
+var allPreorders = window.allPreorders || [];
+var allMessages = window.allMessages || [];
 
 document.addEventListener("DOMContentLoaded", () => {
   const apiInput = document.getElementById("apiUrlInput");
@@ -25,8 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
     tokenInput.value = savedToken;
   }
 
-  // ตรวจสอบ Auth เฉพาะเมื่อเข้าผ่าน seller.html หรือ URL มี ?view=seller
-  if (window.location.pathname.includes("seller.html") || window.location.search.includes("view=seller")) {
+  // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
+  if (window.location.pathname.endsWith("seller.html") || window.location.search.includes("view=seller")) {
     checkAdminAuth();
   }
 });
@@ -700,6 +701,35 @@ function checkAdminAuth() {
     refreshAllData();
   }
 }
+
+function openAdminAuthModal() {
+  const modal = document.getElementById("adminAuthModal");
+  if (!modal) return;
+  modal.classList.add("active");
+  const err = document.getElementById("authErrorMsg");
+  if (err) err.style.display = "none";
+  const input = document.getElementById("adminPasswordInput");
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 150);
+  }
+}
+window.openAdminAuthModal = openAdminAuthModal;
+
+function closeAdminAuthModal() {
+  const modal = document.getElementById("adminAuthModal");
+  if (modal) modal.classList.remove("active");
+  const input = document.getElementById("adminPasswordInput");
+  if (input) input.value = "";
+  const err = document.getElementById("authErrorMsg");
+  if (err) err.style.display = "none";
+  if (typeof showBuyerView === "function") {
+    showBuyerView();
+  } else {
+    window.location.href = "index.html";
+  }
+}
+window.closeAdminAuthModal = closeAdminAuthModal;
 
 function handleAdminLogin(e) {
   if (e) e.preventDefault();

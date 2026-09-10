@@ -6,7 +6,8 @@
  */
 
 // URL สำหรับเชื่อมต่อ Google Apps Script Web API (สามารถเปลี่ยนผ่าน Seller Dashboard ได้)
-let GAS_API_URL = localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || "";
+window.GAS_API_URL = GAS_API_URL;
 
 // ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ
 const DEFAULT_PRODUCTS = [

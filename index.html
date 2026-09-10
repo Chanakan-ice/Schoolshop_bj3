@@ -838,7 +838,7 @@
   </div>
 
   <!-- Modal 6: Admin Login Gate (กรอกรหัสผ่านอะไรก็ได้ แต่ถ้ากดส่งแล้วถูกต้องจึงเข้าหน้าได้ ถ้าผิดเด้งกลับหน้าผู้ซื้อ) -->
-  <div class="modal-overlay" id="adminAuthModal" style="z-index: 99999; backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.85);">
+  <div class="modal-overlay" id="adminAuthModal" onclick="if(event.target === this) closeAdminAuthModal()" style="z-index: 99999; backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.85);">
     <div class="modal-card" id="adminAuthCard" style="max-width: 440px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
       <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
         <div class="modal-title" style="color: #fff;">
