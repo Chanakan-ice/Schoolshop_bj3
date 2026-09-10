@@ -7,7 +7,17 @@
 
 // URL สำหรับเชื่อมต่อ Google Apps Script Web API (ผูกกับ Google Sheets อัตโนมัติ)
 var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
-var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_GAS_URL;
+
+function getActiveApiUrl() {
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
+  if (!url || !url.startsWith("https://script.google.com/macros/s/")) {
+    url = DEFAULT_GAS_URL;
+    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_GAS_URL);
+  }
+  return url;
+}
+
+var GAS_API_URL = getActiveApiUrl();
 window.GAS_API_URL = GAS_API_URL;
 
 // ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ
@@ -491,21 +501,33 @@ async function handleOrderSubmit(e) {
     orderData.pickup_location = sLoc;
   }
 
-  // แนบ Token ผู้ขายเพื่อส่งแจ้งเตือน LINE
+  // แนบอีเมลและ Token ผู้ขายเพื่อส่งแจ้งเตือน
+  orderData.admin_emails = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "";
   orderData.seller_token = localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "";
 
   try {
     let orderId = "ORD-" + Date.now().toString().slice(-6);
+    const targetGasUrl = getActiveApiUrl();
 
-    if (GAS_API_URL) {
-      const response = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(orderData)
-      });
-      const result = await response.json();
-      if (result.success && result.order_id) {
-        orderId = result.order_id;
+    if (targetGasUrl) {
+      try {
+        const response = await fetch(targetGasUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(orderData)
+        });
+        const result = await response.json();
+        if (result.success && result.order_id) {
+          orderId = result.order_id;
+        }
+      } catch (postErr) {
+        console.warn("GAS fetch POST failed (possibly file:/// or CORS), attempting fallback:", postErr);
+        fetch(targetGasUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(orderData)
+        }).catch(e => console.warn("no-cors order err:", e));
       }
     } else {
       // บันทึกลง LocalStorage กรณีไม่มี API
@@ -769,14 +791,16 @@ async function handlePreorderSubmit(e) {
     notify_account: notifyAccount,
     delivery_date: "รอคุณครูกำหนดวัน",
     note: note,
-    seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || ""
+    seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "",
+    admin_emails: localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || ""
   };
 
   let preId = "PRE-" + Date.now().toString().slice(-6);
+  const targetGasUrl = getActiveApiUrl();
 
-  if (GAS_API_URL) {
+  if (targetGasUrl) {
     try {
-      const response = await fetch(GAS_API_URL, {
+      const response = await fetch(targetGasUrl, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(data)
@@ -786,7 +810,13 @@ async function handlePreorderSubmit(e) {
         preId = resJson.preorder_id;
       }
     } catch (err) {
-      console.warn("GAS Preorder error:", err);
+      console.warn("GAS Preorder error (trying no-cors fallback):", err);
+      fetch(targetGasUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(data)
+      }).catch(e => console.warn("no-cors preorder err:", e));
     }
   }
 

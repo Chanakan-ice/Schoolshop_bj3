@@ -140,6 +140,14 @@ function doGet(e) {
       case "setupDatabase":
         return jsonResponse(setupDatabase());
 
+      case "testEmail":
+        const testEmails = (e.parameter && e.parameter.emails) ? e.parameter.emails : "";
+        return jsonResponse(testEmailNotification(testEmails));
+
+      case "saveEmailSettings":
+        const saveEmails = (e.parameter && e.parameter.emails) ? e.parameter.emails : "";
+        return jsonResponse(saveEmailSettingsToProperties(saveEmails));
+
       default:
         return jsonResponse({ success: false, message: "Invalid action" });
     }
@@ -157,7 +165,11 @@ function doPost(e) {
 
   try {
     if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (_) {
+        data = e.parameter || {};
+      }
     } else if (e.parameter) {
       data = e.parameter;
     }

@@ -6,7 +6,17 @@
  */
 
 var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
-var GAS_API_URL = window.GAS_API_URL || localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_GAS_URL;
+
+function getActiveApiUrl() {
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
+  if (!url || !url.startsWith("https://script.google.com/macros/s/")) {
+    url = DEFAULT_GAS_URL;
+    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_GAS_URL);
+  }
+  return url;
+}
+
+var GAS_API_URL = getActiveApiUrl();
 window.GAS_API_URL = GAS_API_URL;
 
 // State
@@ -643,18 +653,22 @@ function updateMetrics() {
 
 // ==================== API Settings ====================
 function saveApiUrl() {
-  const url = document.getElementById("apiUrlInput").value.trim();
+  let url = (document.getElementById("apiUrlInput").value || "").trim();
+  if (!url) {
+    url = DEFAULT_GAS_URL;
+    document.getElementById("apiUrlInput").value = url;
+  }
   GAS_API_URL = url;
   localStorage.setItem("SCHOOLSHOP_API_URL", url);
-  showToast("บันทึก URL สำเร็จแล้ว", "success");
+  showToast("✅ บันทึก URL สำเร็จแล้ว", "success");
   refreshAllData();
 }
 
 async function testApiConnection() {
-  const url = document.getElementById("apiUrlInput").value.trim();
+  let url = (document.getElementById("apiUrlInput").value || "").trim();
   if (!url) {
-    showToast("กรุณาระบุ URL ก่อนทดสอบ", "error");
-    return;
+    url = DEFAULT_GAS_URL;
+    document.getElementById("apiUrlInput").value = url;
   }
 
   showToast("กำลังทดสอบการเชื่อมต่อ...", "info");
@@ -663,6 +677,8 @@ async function testApiConnection() {
     const json = await res.json();
     if (json.success) {
       showToast("🎉 เชื่อมต่อ Google Apps Script API สำเร็จ!", "success");
+      GAS_API_URL = url;
+      localStorage.setItem("SCHOOLSHOP_API_URL", url);
     } else {
       showToast("ตอบกลับจาก API แต่ success = false", "error");
     }
@@ -821,8 +837,9 @@ function saveEmailSettings() {
 
   localStorage.setItem("SCHOOLSHOP_ADMIN_EMAILS", emails);
 
-  if (GAS_API_URL && emails) {
-    fetch(GAS_API_URL, {
+  const targetUrl = getActiveApiUrl();
+  if (targetUrl && emails) {
+    fetch(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({
@@ -830,13 +847,24 @@ function saveEmailSettings() {
         emails: emails
       })
     }).then(res => res.json()).then(json => {
-      if (json.success) {
-        showToast("บันทึกอีเมลผู้รับแจ้งเตือนไปยังเซิร์ฟเวอร์เรียบร้อยแล้ว", "success");
+      if (json && json.success) {
+        console.log("บันทึกอีเมลไปยัง GAS สำเร็จ:", json);
       }
-    }).catch(e => console.warn("Sync email settings err:", e));
+    }).catch(e => {
+      console.warn("POST saveEmailSettings failed, trying fallback...", e);
+      fetch(`${targetUrl}?action=saveEmailSettings&emails=${encodeURIComponent(emails)}`)
+        .catch(() => {
+          fetch(targetUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "saveEmailSettings", emails: emails })
+          }).catch(err => console.warn("no-cors save err:", err));
+        });
+    });
   }
 
-  showToast("บันทึกการตั้งค่าอีเมลแจ้งเตือนเรียบร้อยแล้ว", "success");
+  showToast("✅ บันทึกการตั้งค่าอีเมลแจ้งเตือนเรียบร้อยแล้ว", "success");
 }
 
 async function testEmailNotification() {
@@ -848,34 +876,76 @@ async function testEmailNotification() {
     return;
   }
 
+  // บันทึกลงเครื่องทันที
+  localStorage.setItem("SCHOOLSHOP_ADMIN_EMAILS", emails);
+
   showToast("กำลังส่งอีเมลทดสอบ...", "info");
 
-  if (GAS_API_URL) {
-    try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "testEmail",
-          emails: emails
-        })
-      });
-      const json = await res.json();
-      if (json.success) {
-        showToast(`✅ ${json.message}`, "success");
-        return;
-      } else {
-        showToast(`⚠️ ${json.message || 'ส่งอีเมลทดสอบล้มเหลว'}`, "error");
-        return;
-      }
-    } catch (e) {
-      console.warn("Test email error:", e);
-      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์", "error");
-      return;
-    }
+  const targetUrl = getActiveApiUrl();
+  if (!targetUrl) {
+    showToast("กรุณาระบุ Google Apps Script Web App URL ก่อนทดสอบครับ", "error");
+    return;
   }
 
-  showToast("บันทึกอีเมลเรียบร้อยแล้ว (จะส่งผ่าน GAS เมื่อเชื่อมต่อ Web App URL)", "info");
+  // วิธีที่ 1: ส่งผ่าน POST ปกติ
+  try {
+    const res = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "testEmail",
+        emails: emails
+      })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(`✅ ${json.message}`, "success");
+      return;
+    } else {
+      showToast(`⚠️ ${json.message || 'ส่งอีเมลทดสอบล้มเหลว'}`, "error");
+      return;
+    }
+  } catch (postErr) {
+    console.warn("POST fetch error (อาจเกิดจาก CORS หรือเปิดไฟล์จาก file:///):", postErr);
+  }
+
+  // วิธีที่ 2: ลองส่งผ่าน GET request (เบราว์เซอร์อนุญาต simple GET แม้เปิดจาก file:///)
+  try {
+    const getUrl = `${targetUrl}?action=testEmail&emails=${encodeURIComponent(emails)}`;
+    const res = await fetch(getUrl);
+    const json = await res.json();
+    if (json.success) {
+      showToast(`✅ ${json.message}`, "success");
+      return;
+    } else if (json.message && json.message !== "Invalid action") {
+      showToast(`⚠️ ${json.message}`, "error");
+      return;
+    }
+  } catch (getErr) {
+    console.warn("GET fetch error:", getErr);
+  }
+
+  // วิธีที่ 3: ส่งแบบ mode: 'no-cors' POST (เบราว์เซอร์จะไม่บล็อก CORS คำขอจะถูกส่งไปรัน MailApp บน Google Apps Script ทันที)
+  try {
+    await fetch(targetUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "testEmail",
+        emails: emails
+      })
+    });
+    showToast(`📧 ส่งคำขอทดสอบไปยัง Google Apps Script แล้ว! กรุณาตรวจสอบกล่องจดหมาย (${emails})`, "success");
+    return;
+  } catch (noCorsErr) {
+    console.warn("no-cors fetch failed:", noCorsErr);
+  }
+
+  // วิธีที่ 4: หากเบราว์เซอร์บล็อกทั้งหมด ให้เปิดแท็บใหม่เพื่อรันสคริปต์ตรง
+  const directUrl = `${targetUrl}?action=testEmail&emails=${encodeURIComponent(emails)}`;
+  showToast("กำลังเปิดหน้าต่างส่งอีเมลทดสอบโดยตรง...", "info");
+  window.open(directUrl, "_blank");
 }
 
 function saveLineMessagingSettings() {
