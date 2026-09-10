@@ -447,6 +447,19 @@ body {
   border-color: #cbd5e1;
 }
 
+.preorder-card-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 3px 8px rgba(245, 158, 11, 0.3);
+}
+
+.preorder-card-btn:hover {
+  background: #d97706 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(217, 119, 6, 0.4);
+}
+
 /* ==================== Modals ==================== */
 .modal-overlay {
   position: fixed;
@@ -947,4 +960,120 @@ body {
   .brand-logo span {
     font-size: 1.05rem;
   }
+}
+
+/* ==================== Buyer Type Segmented Toggle ==================== */
+.buyer-type-selector {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: var(--radius-md);
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+}
+
+.type-btn {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.type-btn:hover {
+  color: var(--text-main);
+}
+
+.type-btn.active {
+  background: #ffffff;
+  color: var(--primary-dark);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.type-btn.active.teacher {
+  color: #047857;
+}
+
+/* ==================== Preorder Wait Box ==================== */
+.preorder-wait-box {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid #fde68a;
+  border-left: 5px solid #f59e0b;
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  color: #92400e;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);
+}
+
+.preorder-wait-box strong {
+  color: #78350f;
+  font-weight: 600;
+}
+
+/* ==================== Table & Badge Enhancements ==================== */
+.badge-teacher {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-student {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-due {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  animation: pulseDue 1.5s infinite;
+}
+
+@keyframes pulseDue {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Modal Shake for wrong password */
+.shake-anim {
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
 }

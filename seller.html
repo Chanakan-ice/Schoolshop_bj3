@@ -93,6 +93,7 @@
       </button>
       <button class="dash-tab" onclick="switchTab('preordersTab', this)">
         <i class="fa-solid fa-calendar-check"></i> รายการสั่งจอง (Pre-orders)
+        <span id="preorderBadge" style="background: #ef4444; color: #fff; font-size: 0.72rem; padding: 2px 7px; border-radius: 9999px; margin-left: 4px; display: none;">0</span>
       </button>
       <button class="dash-tab" onclick="switchTab('messagesTab', this)">
         <i class="fa-solid fa-comments"></i> ข้อความสอบถาม (Messages)
@@ -174,8 +175,13 @@
 
     <!-- ==================== TAB 3: Pre-orders ==================== -->
     <section id="preordersTab" class="tab-pane" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i> รายการสั่งจองล่วงหน้า</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i> รายการสั่งจองสินค้าล่วงหน้า</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            ผู้ขายกำหนดวันจัดส่งสินค้า และกดปุ่มส่งแจ้งเตือนไปยัง LINE, IG หรือ SMS ของนักเรียนได้ทันที
+          </p>
+        </div>
       </div>
 
       <div class="table-responsive">
@@ -184,18 +190,17 @@
             <tr>
               <th>รหัสจอง</th>
               <th>วันที่จอง</th>
-              <th>ชื่อนักเรียน</th>
-              <th>เบอร์โทร</th>
-              <th>สินค้าที่จอง</th>
-              <th>จำนวน</th>
-              <th>วันที่ต้องการรับ</th>
+              <th>ผู้สั่งจอง & เบอร์โทร</th>
+              <th>ช่องทางแจ้งเตือน</th>
+              <th>สินค้า / จำนวน</th>
+              <th>วันจัดส่ง (ที่ครูกำหนด)</th>
               <th>สถานะ</th>
-              <th>เปลี่ยนสถานะ</th>
+              <th>การแจ้งเตือน & จัดการ</th>
             </tr>
           </thead>
           <tbody id="preordersTableBody">
             <tr>
-              <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดรายการสั่งจอง...</td>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดรายการสั่งจอง...</td>
             </tr>
           </tbody>
         </table>
@@ -253,6 +258,27 @@
           </button>
           <button class="btn btn-secondary" onclick="testApiConnection()">
             <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
+          </button>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
+
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
+          <i class="fa-brands fa-line" style="color: #06c755;"></i> ตั้งค่า LINE Notify แจ้งเตือนครู/แอดมิน (ส่งได้หลายคนพร้อมกัน)
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+          ใส่ LINE Notify Token ของคุณครูแต่ละท่าน เพื่อรับข้อความแจ้งเตือนเข้า LINE ทันทีที่มีการสั่งซื้อหรือสั่งจองสินค้าใหม่ (สามารถใส่ได้หลายคน โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่)
+        </p>
+        <div class="form-group">
+          <label class="form-label">LINE Notify Tokens (ใส่หลายคนได้):</label>
+          <textarea id="sellerNotifyTokenInput" class="form-textarea" rows="3" placeholder="เช่น&#10;token_ครูA, token_ครูB&#10;token_ครูC"></textarea>
+        </div>
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="saveSellerNotifyToken()">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่าแจ้งเตือน
+          </button>
+          <button class="btn btn-secondary" onclick="testSellerLineTokens()">
+            <i class="fa-brands fa-line" style="color: #06c755;"></i> ทดสอบส่งแจ้งเตือนทุก LINE Token
           </button>
         </div>
 
@@ -371,9 +397,62 @@
     </div>
   </div>
 
+  <!-- ==================== Modal: Notify Buyer (Preorder Ready) ==================== -->
+  <div class="modal-overlay" id="notifyBuyerModal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff;">
+        <div class="modal-title" style="color: #fff;">
+          <i class="fa-solid fa-bell"></i> ส่งแจ้งเตือนกำหนดรับสินค้าให้ผู้ซื้อ
+        </div>
+        <button class="close-btn" style="color: #fff;" onclick="closeNotifyBuyerModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="notifyBuyerPreorderId">
+
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <strong>ผู้รับ: <span id="notifyBuyerName" style="color: var(--primary);">-</span></strong>
+            <span id="notifyBuyerClass" style="font-size: 0.85rem; color: var(--text-muted);">-</span>
+          </div>
+          <div style="font-size: 0.9rem; margin-bottom: 0.35rem;">
+            📦 สินค้าที่จอง: <strong id="notifyBuyerProduct">-</strong> (<span id="notifyBuyerQty">1</span> ชิ้น)
+          </div>
+          <div style="font-size: 0.9rem; margin-bottom: 0.35rem;">
+            📅 วันกำหนดรับของ: <strong id="notifyBuyerDate" style="color: #d97706;">-</strong>
+          </div>
+          <div style="font-size: 0.9rem;">
+            📲 ช่องทางที่นักเรียนระบุไว้: <span id="notifyBuyerChannelBadge" class="badge badge-preparing">-</span>
+            <strong id="notifyBuyerContact" style="color: var(--text-main); margin-left: 0.5rem;">-</strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ข้อความแจ้งเตือน (สามารถแก้ไขได้):</label>
+          <textarea id="notifyBuyerMessageText" class="form-textarea" rows="4"></textarea>
+        </div>
+
+        <!-- Action buttons according to channel -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+          <div id="notifyActionButtons" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <!-- Injected dynamically based on LINE, IG, SMS -->
+          </div>
+          <button class="btn btn-secondary" onclick="copyNotifyText()">
+            <i class="fa-solid fa-copy"></i> คัดลอกข้อความแจ้งเตือน
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeNotifyBuyerModal()">ปิดหน้าต่าง</button>
+        <button type="button" class="btn btn-success" onclick="markPreorderAsNotified()">
+          <i class="fa-solid fa-check"></i> บันทึกว่าส่งแจ้งเตือนแล้ว
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== Modal: Admin Login Gate ==================== -->
   <div class="modal-overlay" id="adminAuthModal" style="z-index: 99999; backdrop-filter: blur(10px); background: rgba(15, 23, 42, 0.85);">
-    <div class="modal-card" style="max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
+    <div class="modal-card" id="adminAuthCard" style="max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
       <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
         <div class="modal-title" style="color: #fff;">
           <i class="fa-solid fa-lock"></i> เข้าสู่ระบบเฉพาะครู/ผู้ขาย

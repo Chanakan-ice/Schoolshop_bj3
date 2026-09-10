@@ -189,13 +189,19 @@ function renderProducts() {
             <div>
               <div class="product-price">${Number(item.price).toLocaleString()} <span>฿</span></div>
               <div class="stock-tag ${isLowStock ? 'low' : ''}">
-                ${isOutOfStock ? '<span style="color: var(--danger); font-weight: 600;">สินค้าหมด</span>' : `คงเหลือ: ${stock} ชิ้น`}
+                ${isOutOfStock ? '<span style="color: #d97706; font-weight: 600;"><i class="fa-solid fa-clock"></i> สินค้าหมด (เปิดรับจอง)</span>' : `คงเหลือ: ${stock} ชิ้น`}
               </div>
             </div>
             
-            <button class="add-cart-btn" onclick="addToCart('${item.id}')" ${isOutOfStock ? 'disabled' : ''}>
-              <i class="fa-solid fa-cart-plus"></i> ${isOutOfStock ? 'หมด' : 'ใส่ตะกร้า'}
-            </button>
+            ${isOutOfStock ? `
+              <button class="add-cart-btn preorder-card-btn" onclick="openPreorderForProduct('${encodeURIComponent(item.name)}')">
+                <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
+              </button>
+            ` : `
+              <button class="add-cart-btn" onclick="addToCart('${item.id}')">
+                <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
+              </button>
+            `}
           </div>
         </div>
       </div>
@@ -325,12 +331,84 @@ function renderCartModal() {
 }
 
 // ==================== Checkout & COD Order Submission ====================
+function switchBuyerType(type) {
+  const btnStudent = document.getElementById("btnTypeStudent");
+  const btnTeacher = document.getElementById("btnTypeTeacher");
+  const studentBlock = document.getElementById("studentFieldsBlock");
+  const teacherBlock = document.getElementById("teacherFieldsBlock");
+  const buyerTypeInput = document.getElementById("custBuyerType");
+
+  if (!btnStudent || !btnTeacher) return;
+
+  if (type === "teacher") {
+    btnTeacher.classList.add("active");
+    btnStudent.classList.remove("active");
+    if (studentBlock) studentBlock.style.display = "none";
+    if (teacherBlock) teacherBlock.style.display = "block";
+    if (buyerTypeInput) buyerTypeInput.value = "teacher";
+  } else {
+    btnStudent.classList.add("active");
+    btnTeacher.classList.remove("active");
+    if (studentBlock) studentBlock.style.display = "block";
+    if (teacherBlock) teacherBlock.style.display = "none";
+    if (buyerTypeInput) buyerTypeInput.value = "student";
+  }
+}
+
+function switchPreorderBuyerType(type) {
+  const btnStudent = document.getElementById("btnPreTypeStudent");
+  const btnTeacher = document.getElementById("btnPreTypeTeacher");
+  const studentBlock = document.getElementById("preStudentFieldsBlock");
+  const teacherBlock = document.getElementById("preTeacherFieldsBlock");
+  const buyerTypeInput = document.getElementById("preBuyerType");
+
+  if (!btnStudent || !btnTeacher) return;
+
+  if (type === "teacher") {
+    btnTeacher.classList.add("active");
+    btnStudent.classList.remove("active");
+    if (studentBlock) studentBlock.style.display = "none";
+    if (teacherBlock) teacherBlock.style.display = "block";
+    if (buyerTypeInput) buyerTypeInput.value = "teacher";
+  } else {
+    btnStudent.classList.add("active");
+    btnTeacher.classList.remove("active");
+    if (studentBlock) studentBlock.style.display = "block";
+    if (teacherBlock) teacherBlock.style.display = "none";
+    if (buyerTypeInput) buyerTypeInput.value = "student";
+  }
+}
+
+function syncTeacherLocation(dept, isPreorder = false) {
+  const prefix = isPreorder ? "preTeacher" : "teacher";
+  const locSelect = document.getElementById(`${prefix}LocationSelect`);
+  if (!locSelect) return;
+
+  const map = {
+    "กลุ่มสาระการเรียนรู้การงานอาชีพ": "ห้องพักครูกลุ่มสาระการงานอาชีพ",
+    "กลุ่มสาระการเรียนรู้ภาษาไทย": "ห้องพักครูกลุ่มสาระภาษาไทย",
+    "กลุ่มสาระการเรียนรู้คณิตศาสตร์": "ห้องพักครูกลุ่มสาระคณิตศาสตร์",
+    "กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี": "ห้องพักครูกลุ่มสาระวิทยาศาสตร์และเทคโนโลยี",
+    "กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม": "ห้องพักครูกลุ่มสาระสังคมศึกษาฯ",
+    "กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา": "ห้องพักครูกลุ่มสาระสุขศึกษาและพลศึกษา",
+    "กลุ่มสาระการเรียนรู้ศิลปะ": "ห้องพักครูกลุ่มสาระศิลปะ",
+    "กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ": "ห้องพักครูกลุ่มสาระภาษาต่างประเทศ",
+    "กิจกรรมพัฒนาผู้เรียน / แนะแนว": "ห้องพักครูแนะแนว / กิจกรรมพัฒนาผู้เรียน",
+    "ฝ่ายบริหาร / บุคลากรทั่วไป": "ห้องสำนักงาน / ฝ่ายบริหาร"
+  };
+
+  if (map[dept]) {
+    locSelect.value = map[dept];
+  }
+}
+
 function openCheckoutModal() {
   if (cart.length === 0) {
     showToast("กรุณาเลือกสินค้าลงในตะกร้าก่อนครับ", "error");
     return;
   }
   closeCartModal();
+  switchBuyerType("student"); // ค่าเริ่มต้นคือนักเรียน
   document.getElementById("checkoutModal").classList.add("active");
 }
 
@@ -344,18 +422,75 @@ async function handleOrderSubmit(e) {
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกคำสั่งซื้อ...';
 
-  const orderData = {
+  const buyerType = (document.getElementById("custBuyerType") && document.getElementById("custBuyerType").value) || "student";
+  const isTeacher = buyerType === "teacher";
+  const name = (document.getElementById("custName") ? document.getElementById("custName").value : "").trim();
+  const phone = (document.getElementById("custPhone") ? document.getElementById("custPhone").value : "").trim();
+  const note = (document.getElementById("custNote") ? document.getElementById("custNote").value : "").trim();
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อ-นามสกุลครับ", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    return;
+  }
+
+  if (!phone || phone.length < 9) {
+    showToast("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (อย่างน้อย 9-10 หลัก)", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    return;
+  }
+
+  let orderData = {
     action: "createOrder",
-    student_name: document.getElementById("custName").value.trim(),
-    student_class: document.getElementById("custClass").value,
-    student_room: document.getElementById("custRoom").value.trim(),
-    student_no: document.getElementById("custNo").value.trim(),
-    phone: document.getElementById("custPhone").value.trim(),
-    pickup_location: document.getElementById("custLocation").value,
-    note: document.getElementById("custNote").value.trim(),
+    buyer_type: isTeacher ? "คุณครู" : "นักเรียน",
     items: cart,
-    total_price: calculateCartTotal()
+    total_price: calculateCartTotal(),
+    student_name: name,
+    phone: phone,
+    note: note
   };
+
+  if (isTeacher) {
+    const tDept = (document.getElementById("teacherDept") ? document.getElementById("teacherDept").value : "กลุ่มสาระการเรียนรู้การงานอาชีพ");
+    const tLocSelect = (document.getElementById("teacherLocationSelect") ? document.getElementById("teacherLocationSelect").value : "ห้องพักครูกลุ่มสาระการงานอาชีพ");
+    const tBuilding = (document.getElementById("teacherBuildingSelect") ? document.getElementById("teacherBuildingSelect").value : "").trim();
+    const tBuildingDetail = (document.getElementById("teacherBuildingDetail") ? document.getElementById("teacherBuildingDetail").value : "").trim();
+
+    let pickupLoc = tLocSelect;
+    if (tBuilding) {
+      pickupLoc += ` (${tBuilding}${tBuildingDetail ? ' ' + tBuildingDetail : ''})`;
+    } else if (tBuildingDetail) {
+      pickupLoc += ` (${tBuildingDetail})`;
+    }
+
+    orderData.department = tDept;
+    orderData.student_class = "ครู: " + tDept;
+    orderData.student_room = "ห้องพักครู";
+    orderData.student_no = "-";
+    orderData.pickup_location = pickupLoc;
+  } else {
+    const sRoom = (document.getElementById("custRoom") ? document.getElementById("custRoom").value : "").trim();
+    const sNo = (document.getElementById("custNo") ? document.getElementById("custNo").value : "").trim();
+    const sLoc = (document.getElementById("custLocationStudent") ? document.getElementById("custLocationStudent").value : "หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)");
+
+    if (!sRoom) {
+      showToast("กรุณากรอกเลขห้องของนักเรียนครับ", "error");
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+      return;
+    }
+
+    orderData.department = "-";
+    orderData.student_class = "นักเรียน";
+    orderData.student_room = sRoom;
+    orderData.student_no = sNo || "-";
+    orderData.pickup_location = sLoc;
+  }
+
+  // แนบ Token ผู้ขายเพื่อส่งแจ้งเตือน LINE
+  orderData.seller_token = localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "";
 
   try {
     let orderId = "ORD-" + Date.now().toString().slice(-6);
@@ -403,7 +538,8 @@ async function handleOrderSubmit(e) {
     closeCheckoutModal();
 
     showToast(`สั่งซื้อสำเร็จ! รหัสคำสั่งซื้อ: ${orderId}`, "success");
-    alert(`🎉 สั่งซื้อสำเร็จเรียบร้อยครับ!\n\nรหัสคำสั่งซื้อ: ${orderId}\nยอดชำระเงินปลายทาง (COD): ${orderData.total_price} บาท\nจุดรับของ: ${orderData.pickup_location}\n\nกรุณาเตรียมเงินสดให้พอดีเมื่อมารับสินค้าครับ`);
+    const buyerDisplay = isTeacher ? `คุณครู ${orderData.student_name} (${orderData.department})` : `${orderData.student_name} (ชั้น ${orderData.student_class}/${orderData.student_room})`;
+    alert(`🎉 สั่งซื้อสินค้าสำเร็จเรียบร้อยครับ!\n\nรหัสคำสั่งซื้อ: ${orderId}\nผู้สั่ง: ${buyerDisplay}\nเบอร์โทร: ${orderData.phone}\nยอดชำระเงินปลายทาง (COD): ${orderData.total_price} บาท\nสถานที่นัดรับของ: ${orderData.pickup_location}\n\nกรุณาเตรียมเงินสดให้พอดีเมื่อมารับสินค้าครับ ขอบคุณครับ`);
   } catch (error) {
     console.error("Order error:", error);
     showToast("เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
@@ -496,32 +632,157 @@ async function searchOrders() {
 
 // ==================== Preorder & Contact Forms ====================
 function openPreorderModal() {
+  document.getElementById("preorderForm").reset();
+  switchPreorderBuyerType("student");
+  handleNotifyChannelChange();
   document.getElementById("preorderModal").classList.add("active");
 }
+
+function openPreorderForProduct(productNameEncoded) {
+  const prodName = decodeURIComponent(productNameEncoded);
+  document.getElementById("preorderForm").reset();
+  switchPreorderBuyerType("student");
+  const nameInput = document.getElementById("preProdName");
+  if (nameInput) nameInput.value = prodName;
+  handleNotifyChannelChange();
+  document.getElementById("preorderModal").classList.add("active");
+}
+
 function closePreorderModal() {
   document.getElementById("preorderModal").classList.remove("active");
 }
 
+function handleNotifyChannelChange() {
+  const channel = document.getElementById("preNotifyChannel").value;
+  const label = document.getElementById("notifyAccountLabel");
+  const input = document.getElementById("preNotifyAccount");
+
+  if (!label || !input) return;
+
+  if (channel === "LINE") {
+    label.innerHTML = '<i class="fa-brands fa-line" style="color: #06c755;"></i> Line ID หรือ เบอร์ที่ผูก LINE *';
+    input.placeholder = "เช่น @somchai_line หรือ 0812345678";
+  } else if (channel === "Instagram") {
+    label.innerHTML = '<i class="fa-brands fa-instagram" style="color: #e1306c;"></i> IG Username (ชื่อไอจี) *';
+    input.placeholder = "เช่น somchai.ig หรือ @somchai";
+  } else {
+    label.innerHTML = '<i class="fa-solid fa-message" style="color: #0284c7;"></i> เบอร์โทรศัพท์สำหรับรับ SMS *';
+    input.placeholder = "เช่น 0812345678";
+  }
+}
+
 async function handlePreorderSubmit(e) {
   e.preventDefault();
+  const submitBtn = document.getElementById("submitPreorderBtn");
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกการจอง...';
+
+  const prodName = document.getElementById("preProdName").value.trim();
+  const prodQty = Number(document.getElementById("preProdQty").value) || 1;
+  const name = document.getElementById("preCustName").value.trim();
+  const phone = document.getElementById("preCustPhone").value.trim();
+  const buyerType = (document.getElementById("preBuyerType") && document.getElementById("preBuyerType").value) || "student";
+  const isTeacher = buyerType === "teacher";
+  const notifyChannel = document.getElementById("preNotifyChannel").value;
+  const notifyAccount = document.getElementById("preNotifyAccount").value.trim();
+  const note = document.getElementById("preCustNote").value.trim();
+
+  if (!prodName) {
+    showToast("กรุณาระบุชื่อสินค้าที่ต้องการสั่งจอง", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    return;
+  }
+
+  if (!name) {
+    showToast("กรุณากรอกชื่อ-นามสกุล", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    return;
+  }
+
+  if (!phone || phone.length < 9) {
+    showToast("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (อย่างน้อย 9-10 หลัก)", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    return;
+  }
+
+  if (!notifyAccount) {
+    showToast("กรุณากรอกข้อมูลช่องทางติดต่อแจ้งเตือน", "error");
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    return;
+  }
+
+  let pickupLoc = "";
+  let studentClass = "นักเรียน";
+  let studentRoom = "";
+  let studentNo = "-";
+  let department = "";
+
+  if (isTeacher) {
+    department = (document.getElementById("preTeacherDept") ? document.getElementById("preTeacherDept").value : "กลุ่มสาระการเรียนรู้การงานอาชีพ");
+    const tLocSelect = (document.getElementById("preTeacherLocationSelect") ? document.getElementById("preTeacherLocationSelect").value : "ห้องพักครูกลุ่มสาระการงานอาชีพ");
+    const tBuilding = (document.getElementById("preTeacherBuildingSelect") ? document.getElementById("preTeacherBuildingSelect").value : "").trim();
+    const tBuildingDetail = (document.getElementById("preTeacherBuildingDetail") ? document.getElementById("preTeacherBuildingDetail").value : "").trim();
+
+    pickupLoc = tLocSelect;
+    if (tBuilding) {
+      pickupLoc += ` (${tBuilding}${tBuildingDetail ? ' ' + tBuildingDetail : ''})`;
+    } else if (tBuildingDetail) {
+      pickupLoc += ` (${tBuildingDetail})`;
+    }
+
+    studentClass = "ครู: " + department;
+    studentRoom = "ห้องพักครู";
+    studentNo = "-";
+  } else {
+    studentRoom = (document.getElementById("preCustRoom") ? document.getElementById("preCustRoom").value : "").trim();
+    studentNo = (document.getElementById("preCustNo") ? document.getElementById("preCustNo").value : "").trim() || "-";
+    pickupLoc = (document.getElementById("preCustLocationStudent") ? document.getElementById("preCustLocationStudent").value : "หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)");
+    department = "-";
+
+    if (!studentRoom) {
+      showToast("กรุณากรอกเลขห้องของนักเรียนครับ", "error");
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+      return;
+    }
+  }
+
   const data = {
     action: "createPreorder",
-    product_name: document.getElementById("preProdName").value.trim(),
-    quantity: Number(document.getElementById("preProdQty").value) || 1,
-    expected_date: document.getElementById("preProdDate").value,
-    student_name: document.getElementById("preCustName").value.trim(),
-    student_class: document.getElementById("preCustClass").value,
-    student_room: document.getElementById("preCustRoom").value.trim(),
-    phone: document.getElementById("preCustPhone").value.trim()
+    product_name: prodName,
+    quantity: prodQty,
+    student_name: name,
+    buyer_type: isTeacher ? "คุณครู" : "นักเรียน",
+    department: department,
+    student_class: studentClass,
+    student_room: studentRoom,
+    student_no: studentNo,
+    pickup_location: pickupLoc,
+    phone: phone,
+    notify_channel: notifyChannel,
+    notify_account: notifyAccount,
+    delivery_date: "รอคุณครูกำหนดวัน",
+    note: note,
+    seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || ""
   };
+
+  let preId = "PRE-" + Date.now().toString().slice(-6);
 
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      const response = await fetch(GAS_API_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(data)
       });
+      const resJson = await response.json();
+      if (resJson.success && resJson.preorder_id) {
+        preId = resJson.preorder_id;
+      }
     } catch (err) {
       console.warn("GAS Preorder error:", err);
     }
@@ -529,12 +790,22 @@ async function handlePreorderSubmit(e) {
 
   // เก็บ LocalStorage
   const preorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
-  preorders.unshift({ preorder_id: "PRE-" + Date.now().toString().slice(-6), timestamp: new Date().toLocaleString("th-TH"), ...data, status: "รอดำเนินการ" });
+  preorders.unshift({
+    preorder_id: preId,
+    timestamp: new Date().toLocaleString("th-TH"),
+    ...data,
+    status: "รอดำเนินการ (รอครูกำหนดวัน)"
+  });
   localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(preorders));
 
   closePreorderModal();
   document.getElementById("preorderForm").reset();
-  showToast("ส่งรายการสั่งจองล่วงหน้าเรียบร้อยแล้ว", "success");
+  showToast(`สั่งจองสำเร็จ! รหัสการจอง: ${preId}`, "success");
+  
+  alert(`🎉 สั่งจองสินค้าสำเร็จเรียบร้อยครับ!\n\nรหัสการจอง: ${preId}\nสินค้า: ${data.product_name} (จำนวน ${data.quantity} ชิ้น)\nผู้สั่งจอง: ${data.student_name} (เบอร์โทร: ${data.phone})\n\n⏳ ข้อตกลงการรับสินค้า: การสั่งจองสินค้าต้องรอจัดเตรียมอย่างน้อย 2 - 3 วัน หรือตามกำหนดวันที่คุณครูผู้ขายได้กำหนดไว้\n\n🔔 เมื่อสินค้าพร้อมรับ ระบบจะส่งแจ้งเตือนผ่าน ${data.notify_channel} (${data.notify_account}) หรือเบอร์โทร ${data.phone} ของท่านครับ ขอบคุณครับ`);
+
+  submitBtn.disabled = false;
+  submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
 }
 
 function openContactModal() {
@@ -595,3 +866,111 @@ function showToast(message, type = "info") {
     setTimeout(() => toast.remove(), 400);
   }, 3500);
 }
+
+// ==================== View Switching & Admin Authentication ====================
+function showBuyerView() {
+  const buyerView = document.getElementById("buyerView");
+  const sellerView = document.getElementById("sellerView");
+  if (buyerView) buyerView.style.display = "block";
+  if (sellerView) sellerView.style.display = "none";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showSellerView() {
+  const buyerView = document.getElementById("buyerView");
+  const sellerView = document.getElementById("sellerView");
+  if (buyerView) buyerView.style.display = "none";
+  if (sellerView) sellerView.style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (typeof refreshAllData === "function") {
+    refreshAllData();
+  }
+}
+
+function openAdminAuthModal() {
+  const modal = document.getElementById("adminAuthModal");
+  if (!modal) return;
+  modal.classList.add("active");
+  const err = document.getElementById("authErrorMsg");
+  if (err) err.style.display = "none";
+  const input = document.getElementById("adminPasswordInput");
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 150);
+  }
+}
+
+function closeAdminAuthModal() {
+  const modal = document.getElementById("adminAuthModal");
+  if (modal) modal.classList.remove("active");
+  const input = document.getElementById("adminPasswordInput");
+  if (input) input.value = "";
+  const err = document.getElementById("authErrorMsg");
+  if (err) err.style.display = "none";
+
+  // ตรวจสอบ: หากไม่ได้ล็อกอินอยู่ ให้กลับสู่หน้าร้านค้าผู้ซื้อเสมอ
+  if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") !== "true") {
+    showBuyerView();
+  }
+}
+
+function handleAdminLogin(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById("adminPasswordInput");
+  const err = document.getElementById("authErrorMsg");
+  const card = document.getElementById("adminAuthCard");
+  const enteredPass = input ? input.value : "";
+  const correctPass = localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || "admin1234";
+
+  if (enteredPass === correctPass) {
+    // รหัสผ่านถูกต้อง -> อนุญาตให้เข้าสู่หน้าแดชบอร์ดผู้ขาย
+    sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
+    if (err) err.style.display = "none";
+    const modal = document.getElementById("adminAuthModal");
+    if (modal) modal.classList.remove("active");
+    if (input) input.value = "";
+    showSellerView();
+    showToast("เข้าสู่ระบบแดชบอร์ดผู้ขายสำเร็จ", "success");
+  } else {
+    // รหัสผ่านไม่ถูกต้อง -> "ถ้ากดเข้าหน้าแอดมินแต่กรอกรหัสไม่ได้ก้ให้เด้งมาหน้าผู้ซื้อเหมือนเดิม"
+    if (err) err.style.display = "block";
+    if (card) {
+      card.classList.add("shake-anim");
+      setTimeout(() => card.classList.remove("shake-anim"), 450);
+    }
+    showToast("รหัสผ่านไม่ถูกต้อง! กำลังนำท่านกลับสู่หน้าร้านค้าผู้ซื้อ...", "error");
+
+    setTimeout(() => {
+      const modal = document.getElementById("adminAuthModal");
+      if (modal) modal.classList.remove("active");
+      if (input) input.value = "";
+      if (err) err.style.display = "none";
+      showBuyerView();
+    }, 1100);
+  }
+}
+
+function logoutAdmin() {
+  sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+  showBuyerView();
+  showToast("ออกจากระบบผู้ขายเรียบร้อยแล้ว", "info");
+}
+
+// ตรวจสอบสถานะการล็อกอินเมื่อเปิดหน้าเว็บ
+document.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get("view");
+
+  if (viewParam === "seller") {
+    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true") {
+      showSellerView();
+    } else {
+      openAdminAuthModal();
+    }
+  } else {
+    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true") {
+      // ผู้ใช้เคยล็อกอินไว้ในเซสชันนี้
+      // สามารถคงอยู่ที่หน้าร้านค้าหรือสลับได้
+    }
+  }
+});

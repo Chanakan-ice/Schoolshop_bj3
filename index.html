@@ -10,100 +10,430 @@
 </head>
 <body>
 
-  <!-- Navigation Bar -->
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="index.html" class="brand-logo">
-        <div class="logo-icon">
-          <i class="fa-solid fa-seedling"></i>
-        </div>
-        <div>
-          <span>CareerShop</span>
-          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ร้านค้าหมวดการงานอาชีพ</div>
-        </div>
-      </a>
+  <!-- ========================================================================= -->
+  <!-- 1. BUYER VIEW (หน้าร้านค้าสำหรับนักเรียนและคุณครูผู้ซื้อ)                  -->
+  <!-- ========================================================================= -->
+  <div id="buyerView">
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <a href="javascript:void(0)" onclick="showBuyerView()" class="brand-logo">
+          <div class="logo-icon">
+            <i class="fa-solid fa-seedling"></i>
+          </div>
+          <div>
+            <span>CareerShop</span>
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ร้านค้าหมวดการงานอาชีพ</div>
+          </div>
+        </a>
 
-      <div class="nav-links">
-        <button class="nav-btn" onclick="openTrackModal()">
-          <i class="fa-solid fa-truck-fast"></i> ติดตามพัสดุ
-        </button>
-        <button class="nav-btn" onclick="openPreorderModal()">
-          <i class="fa-solid fa-calendar-plus"></i> สั่งจองล่วงหน้า
-        </button>
-        <button class="nav-btn" onclick="openContactModal()">
-          <i class="fa-solid fa-comment-dots"></i> สอบถาม
-        </button>
-        <button class="nav-btn cart-btn" onclick="openCartModal()">
-          <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
-          <span class="cart-count" id="cartCount">0</span>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Hero Banner -->
-  <section class="hero">
-    <div class="hero-container">
-      <div class="hero-badge">
-        <i class="fa-solid fa-leaf"></i> สั่งซื้อผลงาน & ผลผลิตฝีมือนักเรียน ชำระเงินปลายทาง (COD)
-      </div>
-      <h1 class="hero-title">ร้านค้าจำหน่ายผลงาน & ผลิตภัณฑ์หมวดการงานอาชีพ</h1>
-      <p class="hero-subtitle">
-        สนับสนุนผลงานฝีมือนักเรียน ทั้งเบเกอรี่ ขนม อาหาร ผลผลิตเกษตรอินทรีย์ งานประดิษฐ์ งานช่าง และวัสดุอุปกรณ์สำหรับวิชาการงานอาชีพ รับของสะดวกพร้อมชำระเงินปลายทาง
-      </p>
-
-      <div class="hero-features">
-        <div class="feature-pill">
-          <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
-        </div>
-        <div class="feature-pill">
-          <i class="fa-solid fa-door-open"></i> รับของที่ห้องหมวดการงานหรือห้องเรียน
-        </div>
-        <div class="feature-pill">
-          <i class="fa-solid fa-star"></i> ผลงานฝีมือนักเรียน สดใหม่ ปลอดภัย
+        <div class="nav-links">
+          <button class="nav-btn" onclick="openTrackModal()">
+            <i class="fa-solid fa-truck-fast"></i> ติดตามพัสดุ
+          </button>
+          <button class="nav-btn" onclick="openPreorderModal()">
+            <i class="fa-solid fa-calendar-plus"></i> สั่งจองล่วงหน้า
+          </button>
+          <button class="nav-btn" onclick="openContactModal()">
+            <i class="fa-solid fa-comment-dots"></i> สอบถาม
+          </button>
+          <button class="nav-btn cart-btn" onclick="openCartModal()">
+            <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
+            <span class="cart-count" id="cartCount">0</span>
+          </button>
+          <button class="nav-btn" onclick="openAdminAuthModal()" style="border-color: rgba(2, 132, 199, 0.4); color: var(--primary); font-weight: 600;" title="เข้าสู่ระบบผู้ขาย (คุณครู/แอดมิน)">
+            <i class="fa-solid fa-user-shield"></i> ครู / ผู้ขาย
+          </button>
         </div>
       </div>
-    </div>
-  </section>
+    </nav>
 
-  <!-- Main Content -->
-  <main class="main-content">
-    
-    <!-- Controls (Search & Category Filters) -->
-    <section class="controls-section">
-      <div class="search-box">
-        <i class="fa-solid fa-magnifying-glass search-icon"></i>
-        <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาผลงาน เช่น คุกกี้, ผักสลัด, กระเป๋าผ้า, งานไม้, ชุดอุปกรณ์...">
-      </div>
+    <!-- Hero Banner -->
+    <section class="hero">
+      <div class="hero-container">
+        <div class="hero-badge">
+          <i class="fa-solid fa-leaf"></i> สั่งซื้อผลงาน & ผลผลิตฝีมือนักเรียน ชำระเงินปลายทาง (COD)
+        </div>
+        <h1 class="hero-title">ร้านค้าจำหน่ายผลงาน & ผลิตภัณฑ์หมวดการงานอาชีพ</h1>
+        <p class="hero-subtitle">
+          สนับสนุนผลงานฝีมือนักเรียน ทั้งเบเกอรี่ ขนม อาหาร ผลผลิตเกษตรอินทรีย์ งานประดิษฐ์ งานช่าง และวัสดุอุปกรณ์สำหรับวิชาการงานอาชีพ รับของสะดวกพร้อมชำระเงินปลายทาง
+        </p>
 
-      <div class="category-pills" id="categoryContainer">
-        <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
-        <button class="cat-pill" data-cat="งานคหกรรม/เบเกอรี่">งานคหกรรม / เบเกอรี่</button>
-        <button class="cat-pill" data-cat="งานเกษตร/ผลผลิต">งานเกษตร / ผลผลิต</button>
-        <button class="cat-pill" data-cat="งานช่าง/งานประดิษฐ์">งานช่าง / งานประดิษฐ์</button>
-        <button class="cat-pill" data-cat="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</button>
+        <div class="hero-features">
+          <div class="feature-pill">
+            <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
+          </div>
+          <div class="feature-pill">
+            <i class="fa-solid fa-door-open"></i> รับของที่ห้องหมวดการงานหรือห้องเรียน
+          </div>
+          <div class="feature-pill">
+            <i class="fa-solid fa-star"></i> ผลงานฝีมือนักเรียน สดใหม่ ปลอดภัย
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Product Grid -->
-    <section>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-        <h2 style="font-size: 1.35rem; color: var(--text-main); font-weight: 600;">
-          <i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้า
-        </h2>
-        <span id="productCount" style="font-size: 0.9rem; color: var(--text-muted);">กำลังโหลดสินค้า...</span>
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- Controls (Search & Category Filters) -->
+      <section class="controls-section">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาผลงาน เช่น คุกกี้, ผักสลัด, กระเป๋าผ้า, งานไม้, ชุดอุปกรณ์...">
+        </div>
+
+        <div class="category-pills" id="categoryContainer">
+          <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
+          <button class="cat-pill" data-cat="งานคหกรรม/เบเกอรี่">งานคหกรรม / เบเกอรี่</button>
+          <button class="cat-pill" data-cat="งานเกษตร/ผลผลิต">งานเกษตร / ผลผลิต</button>
+          <button class="cat-pill" data-cat="งานช่าง/งานประดิษฐ์">งานช่าง / งานประดิษฐ์</button>
+          <button class="cat-pill" data-cat="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</button>
+        </div>
+      </section>
+
+      <!-- Product Grid -->
+      <section>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <h2 style="font-size: 1.35rem; color: var(--text-main); font-weight: 600;">
+            <i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้า
+          </h2>
+          <span id="productCount" style="font-size: 0.9rem; color: var(--text-muted);">กำลังโหลดสินค้า...</span>
+        </div>
+
+        <div class="products-grid" id="productsGrid">
+          <!-- Products will be injected by app.js -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Buyer Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <p style="font-weight: 600; color: var(--primary-dark);">🌱 ระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ (CareerShop)</p>
+        <p>จำหน่ายผลผลิต งานฝีมือ และอุปกรณ์การเรียน | สนับสนุนการเรียนรู้และทักษะอาชีพนักเรียน</p>
+        <div style="margin-top: 0.5rem;">
+          <button class="btn btn-secondary" onclick="openAdminAuthModal()" style="font-size: 0.85rem; padding: 0.4rem 0.9rem;">
+            <i class="fa-solid fa-lock"></i> เข้าสู่ระบบคุณครู / ผู้ดูแลระบบ
+          </button>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">© 2026 CareerShop. กลุ่มสาระการเรียนรู้การงานอาชีพ</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. SELLER VIEW (หน้าแดชบอร์ดจัดการร้านค้าสำหรับคุณครูผู้ขาย)                -->
+  <!-- ========================================================================= -->
+  <div id="sellerView" style="display: none;">
+    <!-- Navigation Bar for Seller -->
+    <nav class="navbar" style="background: #0f172a; border-bottom: 2px solid var(--primary);">
+      <div class="nav-container">
+        <a href="javascript:void(0)" class="brand-logo">
+          <div class="logo-icon" style="background: linear-gradient(135deg, #0284c7, #38bdf8);">
+            <i class="fa-solid fa-shield-halved" style="color: #fff;"></i>
+          </div>
+          <div>
+            <span style="color: #fff;">Career Admin</span>
+            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: normal;">ระบบจัดการร้านค้าหมวดการงานอาชีพ</div>
+          </div>
+        </a>
+
+        <div class="nav-links">
+          <button class="nav-btn" onclick="refreshAllData()" style="color: #e2e8f0; border-color: #334155;">
+            <i class="fa-solid fa-arrows-rotate"></i> รีเฟรชข้อมูล
+          </button>
+          <button class="nav-btn" onclick="showBuyerView()" style="color: #38bdf8; border-color: #0284c7;">
+            <i class="fa-solid fa-store"></i> ดูหน้าร้านค้า
+          </button>
+          <button class="nav-btn" style="color: #f87171; border-color: #7f1d1d; font-weight: 600;" onclick="logoutAdmin()">
+            <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ / กลับหน้าร้านค้า
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Dashboard Main Content -->
+    <main class="main-content">
+      <!-- KPI Summary Metrics -->
+      <div class="dashboard-metrics">
+        <div class="metric-card">
+          <div class="metric-icon blue">
+            <i class="fa-solid fa-bag-shopping"></i>
+          </div>
+          <div class="metric-info">
+            <h3 id="statTotalOrders">0</h3>
+            <p>คำสั่งซื้อทั้งหมด</p>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon amber">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+          </div>
+          <div class="metric-info">
+            <h3 id="statPendingOrders">0</h3>
+            <p>รอดำเนินการ / จัดเตรียม</p>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon green">
+            <i class="fa-solid fa-sack-dollar"></i>
+          </div>
+          <div class="metric-info">
+            <h3 id="statTotalRevenue">0 ฿</h3>
+            <p>ยอดขายรวม (COD)</p>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon red">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div class="metric-info">
+            <h3 id="statLowStock">0</h3>
+            <p>สินค้าสต็อกเหลือน้อย</p>
+          </div>
+        </div>
       </div>
 
-      <div class="products-grid" id="productsGrid">
-        <!-- Products will be injected by app.js -->
+      <!-- Tab Navigation -->
+      <div class="dashboard-tabs">
+        <button class="dash-tab active" onclick="switchTab('ordersTab', this)">
+          <i class="fa-solid fa-receipt"></i> จัดการคำสั่งซื้อ (Orders)
+        </button>
+        <button class="dash-tab" onclick="switchTab('productsTab', this)">
+          <i class="fa-solid fa-boxes-stacked"></i> จัดการสินค้าและสต็อก (Products)
+        </button>
+        <button class="dash-tab" onclick="switchTab('preordersTab', this)">
+          <i class="fa-solid fa-calendar-check"></i> รายการสั่งจอง (Pre-orders)
+          <span id="preorderBadge" style="background: #ef4444; color: #fff; font-size: 0.72rem; padding: 2px 7px; border-radius: 9999px; margin-left: 4px; display: none;">0</span>
+        </button>
+        <button class="dash-tab" onclick="switchTab('messagesTab', this)">
+          <i class="fa-solid fa-comments"></i> ข้อความสอบถาม (Messages)
+        </button>
+        <button class="dash-tab" onclick="switchTab('settingsTab', this)">
+          <i class="fa-solid fa-gear"></i> ตั้งค่า API & LINE (Settings)
+        </button>
       </div>
-    </section>
 
-  </main>
+      <!-- ==================== TAB 1: Orders ==================== -->
+      <section id="ordersTab" class="tab-pane">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-clipboard-list" style="color: var(--primary);"></i> รายการคำสั่งซื้อทั้งหมด</h2>
+          <div style="display: flex; gap: 0.5rem;">
+            <select id="orderFilterStatus" class="form-select" style="width: auto; padding: 0.4rem 0.8rem;" onchange="filterOrders()">
+              <option value="all">ทุกสถานะ</option>
+              <option value="รอดำเนินการ">รอดำเนินการ</option>
+              <option value="กำลังจัดเตรียม">กำลังจัดเตรียม</option>
+              <option value="พร้อมรับของ">พร้อมรับของ</option>
+              <option value="สำเร็จ">สำเร็จ (รับของแล้ว)</option>
+              <option value="ยกเลิก">ยกเลิก</option>
+            </select>
+          </div>
+        </div>
 
-  <!-- ==================== Modals ==================== -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>รหัสสั่งซื้อ</th>
+                <th>วันที่/เวลา</th>
+                <th>ผู้สั่งซื้อ (นักเรียน / คุณครู)</th>
+                <th>เบอร์โทร</th>
+                <th>สถานที่รับของ</th>
+                <th>รายการสินค้า</th>
+                <th>ยอดรวม (COD)</th>
+                <th>สถานะคำสั่งซื้อ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดข้อมูลคำสั่งซื้อ...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-  <!-- 1. Cart Modal -->
+      <!-- ==================== TAB 2: Products ==================== -->
+      <section id="productsTab" class="tab-pane" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-boxes-stacked" style="color: var(--primary);"></i> รายการสินค้าและสต็อก</h2>
+          <button class="btn btn-primary" onclick="openAddProductModal()">
+            <i class="fa-solid fa-plus"></i> เพิ่มสินค้าใหม่
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>รูปภาพ</th>
+                <th>รหัส</th>
+                <th>ชื่อสินค้า</th>
+                <th>หมวดหมู่</th>
+                <th>ราคา (฿)</th>
+                <th>สต็อกคงเหลือ</th>
+                <th>สถานะการขาย</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="productsTableBody">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดรายการสินค้า...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: Pre-orders ==================== -->
+      <section id="preordersTab" class="tab-pane" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-calendar-check" style="color: #f59e0b;"></i> รายการสั่งจองสินค้าล่วงหน้า (Pre-orders)</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+              เมื่อสินค้าหมด นักเรียนหรือครูสามารถสั่งจองได้ โดยคุณครูกำหนดวันส่งมอบ และกดส่งแจ้งเตือนผ่านช่องทาง LINE / IG / SMS ที่ผู้ซื้อระบุไว้
+            </p>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>รหัสการจอง</th>
+                <th>วันที่จอง</th>
+                <th>ผู้สั่งจอง & เบอร์โทร</th>
+                <th>ช่องทางรับแจ้งเตือน</th>
+                <th>สินค้า & จำนวน</th>
+                <th>กำหนดวันรับของ (ครูผู้ขายระบุ)</th>
+                <th>สถานะการจอง</th>
+                <th>การแจ้งเตือนผู้ซื้อ</th>
+              </tr>
+            </thead>
+            <tbody id="preordersTableBody">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดข้อมูลการจองสินค้า...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: Messages ==================== -->
+      <section id="messagesTab" class="tab-pane" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="font-size: 1.25rem;"><i class="fa-solid fa-comments" style="color: var(--primary);"></i> กล่องข้อความสอบถามจากนักเรียน</h2>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>รหัส</th>
+                <th>วันที่/เวลา</th>
+                <th>ชื่อผู้สอบถาม</th>
+                <th>ห้องเรียน/ติดต่อ</th>
+                <th>ข้อความ</th>
+                <th>การตอบกลับ</th>
+                <th>สถานะ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="messagesTableBody">
+              <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">กำลังโหลดข้อความ...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: Settings ==================== -->
+      <section id="settingsTab" class="tab-pane" style="display: none;">
+        <div style="max-width: 650px; background: #fff; padding: 1.75rem; border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+          <h2 style="font-size: 1.25rem; margin-bottom: 1rem;"><i class="fa-solid fa-gear" style="color: var(--primary);"></i> ตั้งค่าระบบและ API Backend</h2>
+
+          <div class="form-group">
+            <label class="form-label">Google Apps Script Web App URL:</label>
+            <input type="url" id="apiUrlInput" class="form-input" placeholder="https://script.google.com/macros/s/.../exec">
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+            <button class="btn btn-primary" onclick="saveApiUrl()">
+              <i class="fa-solid fa-floppy-disk"></i> บันทึก URL
+            </button>
+            <button class="btn btn-secondary" onclick="testApiConnection()">
+              <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
+            </button>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
+            <i class="fa-brands fa-line" style="color: #06c755;"></i> ตั้งค่า LINE Notify แจ้งเตือนครู/แอดมิน (ส่งได้หลายคนพร้อมกัน)
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+            ใส่ LINE Notify Token ของคุณครูแต่ละท่าน เพื่อรับข้อความแจ้งเตือนเข้า LINE ทันทีที่มีการสั่งซื้อหรือสั่งจองสินค้าใหม่ (สามารถใส่ได้หลายคน โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่)
+          </p>
+          <div class="form-group">
+            <label class="form-label">LINE Notify Tokens (ใส่หลายคนได้):</label>
+            <textarea id="sellerNotifyTokenInput" class="form-textarea" rows="3" placeholder="เช่น&#10;token_ครูA, token_ครูB&#10;token_ครูC"></textarea>
+          </div>
+          <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="saveSellerNotifyToken()">
+              <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่าแจ้งเตือน
+            </button>
+            <button class="btn btn-secondary" onclick="testSellerLineTokens()">
+              <i class="fa-brands fa-line" style="color: #06c755;"></i> ทดสอบส่งแจ้งเตือนทุก LINE Token
+            </button>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
+
+          <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
+            <i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่านเข้าสู่ระบบผู้ขาย/แอดมิน
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+            รหัสผ่านนี้ใช้ป้องกันไม่ให้นักเรียนหรือผู้ซื้อทั่วไปเข้าถึงระบบจัดการร้านค้า (ค่าเริ่มต้น: <code>admin1234</code>)
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">รหัสผ่านใหม่:</label>
+              <input type="password" id="newAdminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านใหม่">
+            </div>
+            <div class="form-group">
+              <label class="form-label">ยืนยันรหัสผ่านใหม่:</label>
+              <input type="password" id="confirmAdminPasswordInput" class="form-input" placeholder="ยืนยันรหัสผ่าน">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="changeAdminPassword()">
+            <i class="fa-solid fa-shield-halved"></i> บันทึกรหัสผ่านใหม่
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Seller Footer -->
+    <footer class="footer" style="background: #0f172a; color: #94a3b8; border-top: 1px solid #1e293b;">
+      <div class="footer-content">
+        <p style="font-weight: 600; color: #e2e8f0;">ระบบจัดการร้านค้าหมวดการงานอาชีพ (Career Admin Dashboard)</p>
+        <p style="font-size: 0.8rem; color: #64748b;">เฉพาะคุณครูผู้ดูแลระบบหมวดการงานอาชีพเท่านั้น</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3. MODALS & DIALOGS (SHARED ACROSS VIEWS)                                 -->
+  <!-- ========================================================================= -->
+
+  <!-- Modal 1: Shopping Cart Modal -->
   <div class="modal-overlay" id="cartModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -113,80 +443,147 @@
         <button class="close-btn" onclick="closeCartModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <div id="cartItemsList" class="cart-items-list">
-          <!-- Injected via JavaScript -->
+        <div class="cart-items-container" id="cartItemsList">
+          <!-- Cart items injected by JS -->
         </div>
 
-        <div class="cart-summary">
-          <span>ยอดรวมทั้งหมด:</span>
-          <span id="cartTotalPrice" style="color: var(--primary);">0 ฿</span>
+        <div class="cart-summary" style="margin-top: 1.25rem;">
+          <div class="summary-row total">
+            <span>ยอดรวมทั้งสิ้น (COD)</span>
+            <span id="cartTotalPrice">0 บาท</span>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            * ชำระเงินสดปลายทางเมื่อรับสินค้า
+          </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeCartModal()">เลือกซื้อต่อ</button>
-        <button class="btn btn-primary" id="checkoutBtn" onclick="openCheckoutModal()">
-          สั่งซื้อเลย (COD) <i class="fa-solid fa-arrow-right"></i>
-        </button>
+
+        <div class="modal-footer" style="padding-left: 0; padding-right: 0; margin-top: 1rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeCartModal()">เลือกสินค้าต่อ</button>
+          <button type="button" class="btn btn-primary" id="checkoutBtn" onclick="proceedToCheckout()">
+            <i class="fa-solid fa-arrow-right"></i> ไปหน้าสั่งซื้อ (COD)
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 2. Checkout Modal -->
+  <!-- Modal 2: Checkout Modal (รองรับทั้งนักเรียนและคุณครู) -->
   <div class="modal-overlay" id="checkoutModal">
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">
-          <i class="fa-solid fa-clipboard-check"></i> ยืนยันการสั่งซื้อ (COD)
+          <i class="fa-solid fa-clipboard-check"></i> ยืนยันการสั่งซื้อสินค้า (COD)
         </div>
         <button class="close-btn" onclick="closeCheckoutModal()">&times;</button>
       </div>
       <div class="modal-body">
+
         <form id="orderForm" onsubmit="handleOrderSubmit(event)">
           
+          <!-- 1. ชื่อ - นามสกุล (ไม่มีคำว่านักเรียน) -->
           <div class="form-group">
-            <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ-นามสกุล นักเรียน *</label>
-            <input type="text" id="custName" class="form-input" placeholder="เช่น ด.ช.สมชาย ใจดี" required>
+            <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ - นามสกุล *</label>
+            <input type="text" id="custName" class="form-input" placeholder="กรอกชื่อและนามสกุลจริง" required>
           </div>
 
-          <div class="form-row-3">
-            <div class="form-group">
-              <label class="form-label"><i class="fa-solid fa-graduation-cap"></i> ระดับชั้น *</label>
-              <select id="custClass" class="form-select" required>
-                <option value="ม.1">ม.1</option>
-                <option value="ม.2">ม.2</option>
-                <option value="ม.3">ม.3</option>
-                <option value="ม.4">ม.4</option>
-                <option value="ม.5">ม.5</option>
-                <option value="ม.6">ม.6</option>
-                <option value="คุณครู/บุคลากร">คุณครู/บุคลากร</option>
-              </select>
+          <!-- 2. ตัวเลือกระหว่างนักเรียนและครู (แทนที่ระดับชั้นเดิม) -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-user-tag"></i> สถานะผู้สั่งซื้อ (นักเรียน / คุณครู) *</label>
+            <div class="buyer-type-selector">
+              <button type="button" class="type-btn active" id="btnTypeStudent" onclick="switchBuyerType('student')">
+                <i class="fa-solid fa-graduation-cap"></i> นักเรียน
+              </button>
+              <button type="button" class="type-btn teacher" id="btnTypeTeacher" onclick="switchBuyerType('teacher')">
+                <i class="fa-solid fa-chalkboard-user"></i> คุณครู / บุคลากร
+              </button>
             </div>
-            <div class="form-group">
-              <label class="form-label">ห้อง *</label>
-              <input type="text" id="custRoom" class="form-input" placeholder="เช่น 2, 4" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">เลขที่ *</label>
-              <input type="number" id="custNo" class="form-input" placeholder="เช่น 15" required>
-            </div>
+            <input type="hidden" id="custBuyerType" value="student">
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label"><i class="fa-solid fa-phone"></i> เบอร์โทรศัพท์ *</label>
-              <input type="tel" id="custPhone" class="form-input" placeholder="เช่น 0812345678" required>
+          <!-- 3. ฟิลด์สำหรับ "นักเรียน" (เลขห้อง, เลขที่, จุดนัดรับ: หมวดการงาน หรือ ห้องคหกรรม เท่านั้น) -->
+          <div id="studentFieldsBlock">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-door-closed"></i> ห้อง (เลขห้อง) *</label>
+                <input type="text" id="custRoom" class="form-input" placeholder="เช่น 2/3, 1/2, 305">
+              </div>
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-hashtag"></i> เลขที่ *</label>
+                <input type="number" id="custNo" class="form-input" placeholder="เช่น 15">
+              </div>
             </div>
+
             <div class="form-group">
-              <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของ</label>
-              <select id="custLocation" class="form-select">
-                <option value="ห้องพักครูหมวดการงานอาชีพ">ห้องพักครูหมวดการงานอาชีพ</option>
-                <option value="ห้องปฏิบัติการคหกรรม/ทำอาหาร">ห้องปฏิบัติการคหกรรม/ทำอาหาร</option>
-                <option value="แปลงเกษตรโรงเรียน">แปลงเกษตรโรงเรียน</option>
-                <option value="ห้องเรียน (ช่วงพักกลางวัน)">ห้องเรียน (ช่วงพักกลางวัน)</option>
+              <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของ *</label>
+              <select id="custLocationStudent" class="form-select">
+                <option value="หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)">หมวดการงานอาชีพ</option>
+                <option value="ห้องคหกรรม (ห้องปฏิบัติการคหกรรม)">ห้องคหกรรม</option>
               </select>
             </div>
           </div>
 
+          <!-- 4. ฟิลด์สำหรับ "คุณครู" (กลุ่มสาระการเรียนรู้, จุดนัดรับ: ห้องพักครูกลุ่มสาระต่างๆ กับ อาคารนัดรับ) -->
+          <div id="teacherFieldsBlock" style="display: none;">
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-school"></i> กลุ่มสาระการเรียนรู้ *</label>
+              <select id="teacherDept" class="form-select" onchange="syncTeacherLocation(this.value, false)">
+                <option value="กลุ่มสาระการเรียนรู้การงานอาชีพ">กลุ่มสาระการเรียนรู้การงานอาชีพ</option>
+                <option value="กลุ่มสาระการเรียนรู้ภาษาไทย">กลุ่มสาระการเรียนรู้ภาษาไทย</option>
+                <option value="กลุ่มสาระการเรียนรู้คณิตศาสตร์">กลุ่มสาระการเรียนรู้คณิตศาสตร์</option>
+                <option value="กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี">กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี</option>
+                <option value="กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม">กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม</option>
+                <option value="กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา">กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา</option>
+                <option value="กลุ่มสาระการเรียนรู้ศิลปะ">กลุ่มสาระการเรียนรู้ศิลปะ</option>
+                <option value="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ">กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ</option>
+                <option value="กิจกรรมพัฒนาผู้เรียน / แนะแนว">กิจกรรมพัฒนาผู้เรียน / แนะแนว</option>
+                <option value="ฝ่ายบริหาร / บุคลากรทั่วไป">ฝ่ายบริหาร / บุคลากรทั่วไป</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-door-open"></i> จุดนัดรับ (ห้องพักครูกลุ่มสาระต่างๆ) *</label>
+                <select id="teacherLocationSelect" class="form-select">
+                  <option value="ห้องพักครูกลุ่มสาระการงานอาชีพ">ห้องพักครูกลุ่มสาระการงานอาชีพ</option>
+                  <option value="ห้องพักครูกลุ่มสาระภาษาไทย">ห้องพักครูกลุ่มสาระภาษาไทย</option>
+                  <option value="ห้องพักครูกลุ่มสาระคณิตศาสตร์">ห้องพักครูกลุ่มสาระคณิตศาสตร์</option>
+                  <option value="ห้องพักครูกลุ่มสาระวิทยาศาสตร์และเทคโนโลยี">ห้องพักครูกลุ่มสาระวิทยาศาสตร์และเทคโนโลยี</option>
+                  <option value="ห้องพักครูกลุ่มสาระสังคมศึกษาฯ">ห้องพักครูกลุ่มสาระสังคมศึกษาฯ</option>
+                  <option value="ห้องพักครูกลุ่มสาระสุขศึกษาและพลศึกษา">ห้องพักครูกลุ่มสาระสุขศึกษาและพลศึกษา</option>
+                  <option value="ห้องพักครูกลุ่มสาระศิลปะ">ห้องพักครูกลุ่มสาระศิลปะ</option>
+                  <option value="ห้องพักครูกลุ่มสาระภาษาต่างประเทศ">ห้องพักครูกลุ่มสาระภาษาต่างประเทศ</option>
+                  <option value="ห้องพักครูแนะแนว / กิจกรรมพัฒนาผู้เรียน">ห้องพักครูแนะแนว / กิจกรรมพัฒนาผู้เรียน</option>
+                  <option value="ห้องสำนักงาน / ฝ่ายบริหาร">ห้องสำนักงาน / ฝ่ายบริหาร</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-building"></i> อาคารนัดรับ</label>
+                <select id="teacherBuildingSelect" class="form-select">
+                  <option value="">-- เลือกอาคารนัดรับ (หรือระบุ) --</option>
+                  <option value="อาคาร 1">อาคาร 1</option>
+                  <option value="อาคาร 2">อาคาร 2</option>
+                  <option value="อาคาร 3">อาคาร 3</option>
+                  <option value="อาคาร 4">อาคาร 4</option>
+                  <option value="อาคาร 5">อาคาร 5</option>
+                  <option value="อาคารอำนวยการ / เฉลิมพระเกียรติ">อาคารอำนวยการ / เฉลิมพระเกียรติ</option>
+                  <option value="อาคารอเนกประสงค์ / โรงอาหาร">อาคารอเนกประสงค์ / โรงอาหาร</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-location-pin"></i> รายละเอียดอาคาร / ห้องนัดรับเพิ่มเติม (ถ้ามี)</label>
+              <input type="text" id="teacherBuildingDetail" class="form-input" placeholder="เช่น ชั้น 2 ห้อง 215 หรือ โต๊ะทำงานครู">
+            </div>
+          </div>
+
+          <!-- 5. เบอร์โทรศัพท์ (จำเป็น) -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-phone"></i> เบอร์โทรศัพท์ *</label>
+            <input type="tel" id="custPhone" class="form-input" placeholder="เช่น 0812345678 (จำเป็นสำหรับการติดต่อส่งของ COD)" required>
+          </div>
+
+          <!-- 6. หมายเหตุเพิ่มเติม -->
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-pen-to-square"></i> หมายเหตุเพิ่มเติม</label>
             <input type="text" id="custNote" class="form-input" placeholder="เช่น ขอรับของก่อนเที่ยง">
@@ -198,7 +595,7 @@
             <div>
               <strong>วิธีชำระเงิน: เก็บเงินปลายทาง (Cash on Delivery)</strong>
               <div style="font-size: 0.8rem; margin-top: 2px;">
-                เตรียมเงินสดให้พอดีเมื่อมารับสินค้า ณ จุดนัดรับที่เลือกไว้
+                เตรียมเงินสดให้พอดีเมื่อมารับสินค้า ณ สถานที่นัดรับที่ระบุไว้
               </div>
             </div>
           </div>
@@ -214,7 +611,7 @@
     </div>
   </div>
 
-  <!-- 3. Tracking Modal -->
+  <!-- Modal 3: Tracking Modal -->
   <div class="modal-overlay" id="trackModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -225,7 +622,7 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">กรอกเบอร์โทร หรือ ชื่อนักเรียน หรือ รหัสคำสั่งซื้อ:</label>
+          <label class="form-label">กรอกเบอร์โทร หรือ ชื่อผู้สั่ง หรือ รหัสคำสั่งซื้อ:</label>
           <div style="display: flex; gap: 0.5rem;">
             <input type="text" id="trackQueryInput" class="form-input" placeholder="เช่น 0812345678 หรือ สมชาย">
             <button class="btn btn-primary" onclick="searchOrders()">ค้นหา</button>
@@ -239,7 +636,7 @@
     </div>
   </div>
 
-  <!-- 4. Preorder Modal -->
+  <!-- Modal 4: Preorder Modal (แจ้งรออย่างน้อย 2-3 วัน + บังคับกรอกเบอร์โทร) -->
   <div class="modal-overlay" id="preorderModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -249,60 +646,166 @@
         <button class="close-btn" onclick="closePreorderModal()">&times;</button>
       </div>
       <div class="modal-body">
+
+        <!-- กล่องแจ้งเตือนเวลารอ 2-3 วัน ชัดเจนตามเงื่อนไข -->
+        <div class="preorder-wait-box">
+          <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+            <i class="fa-solid fa-clock-rotate-left" style="font-size: 1.4rem; margin-top: 2px; color: #d97706;"></i>
+            <div>
+              <strong style="font-size: 0.95rem;">แจ้งผู้สั่งจองสินค้า (ข้อตกลงและระยะเวลารอคอย):</strong><br>
+              การสั่งจองสินค้าล่วงหน้าต้องรอจัดเตรียมอย่างน้อย <strong>2 - 3 วัน</strong> หรือตามกำหนดวันที่ครูผู้ขายได้กำหนดไว้ โดยเมื่อถึงกำหนดส่งมอบ ระบบจะแจ้งเตือนผ่านช่องทางที่ท่านระบุไว้ (LINE, IG หรือ SMS/เบอร์โทร)
+            </div>
+          </div>
+        </div>
+
         <form id="preorderForm" onsubmit="handlePreorderSubmit(event)">
           <div class="form-group">
-            <label class="form-label">ชื่อสินค้าที่ต้องการสั่งจอง *</label>
-            <input type="text" id="preProdName" class="form-input" placeholder="เช่น เสื้อพละเบอร์ L, เข็มกลัดรุ่นพิเศษ" required>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">จำนวนที่ต้องการ *</label>
-              <input type="number" id="preProdQty" class="form-input" min="1" value="1" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">วันที่ต้องการรับของโดยประมาณ</label>
-              <input type="date" id="preProdDate" class="form-input">
-            </div>
+            <label class="form-label"><i class="fa-solid fa-box"></i> ชื่อสินค้าที่ต้องการสั่งจอง *</label>
+            <input type="text" id="preProdName" class="form-input" placeholder="เช่น คุกกี้เนยสด, ผักสลัดไฮโดรโปนิกส์" required>
           </div>
 
           <div class="form-group">
-            <label class="form-label">ชื่อ-นามสกุล นักเรียน *</label>
-            <input type="text" id="preCustName" class="form-input" placeholder="ด.ช.สมชาย ใจดี" required>
+            <label class="form-label"><i class="fa-solid fa-hashtag"></i> จำนวนที่ต้องการจอง *</label>
+            <input type="number" id="preProdQty" class="form-input" min="1" value="1" required>
           </div>
 
-          <div class="form-row-3">
+          <!-- 1. ชื่อ - นามสกุล (ไม่มีคำว่านักเรียน) -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ - นามสกุล *</label>
+            <input type="text" id="preCustName" class="form-input" placeholder="กรอกชื่อและนามสกุลจริง" required>
+          </div>
+
+          <!-- 2. ตัวเลือกระหว่างนักเรียนและครู (แทนที่ระดับชั้นเดิม) -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-user-tag"></i> สถานะผู้สั่งซื้อ (นักเรียน / คุณครู) *</label>
+            <div class="buyer-type-selector">
+              <button type="button" class="type-btn active" id="btnPreTypeStudent" onclick="switchPreorderBuyerType('student')">
+                <i class="fa-solid fa-graduation-cap"></i> นักเรียน
+              </button>
+              <button type="button" class="type-btn teacher" id="btnPreTypeTeacher" onclick="switchPreorderBuyerType('teacher')">
+                <i class="fa-solid fa-chalkboard-user"></i> คุณครู / บุคลากร
+              </button>
+            </div>
+            <input type="hidden" id="preBuyerType" value="student">
+          </div>
+
+          <!-- 3. ฟิลด์สำหรับ "นักเรียน" (เลขห้อง, เลขที่, จุดนัดรับ: หมวดการงาน หรือ ห้องคหกรรม เท่านั้น) -->
+          <div id="preStudentFieldsBlock">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-door-closed"></i> ห้อง (เลขห้อง) *</label>
+                <input type="text" id="preCustRoom" class="form-input" placeholder="เช่น 2/3, 1/2, 305">
+              </div>
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-hashtag"></i> เลขที่ *</label>
+                <input type="number" id="preCustNo" class="form-input" placeholder="เช่น 15">
+              </div>
+            </div>
+
             <div class="form-group">
-              <label class="form-label">ชั้น</label>
-              <select id="preCustClass" class="form-select">
-                <option value="ม.1">ม.1</option>
-                <option value="ม.2">ม.2</option>
-                <option value="ม.3">ม.3</option>
-                <option value="ม.4">ม.4</option>
-                <option value="ม.5">ม.5</option>
-                <option value="ม.6">ม.6</option>
+              <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของ *</label>
+              <select id="preCustLocationStudent" class="form-select">
+                <option value="หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)">หมวดการงานอาชีพ</option>
+                <option value="ห้องคหกรรม (ห้องปฏิบัติการคหกรรม)">ห้องคหกรรม</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 4. ฟิลด์สำหรับ "คุณครู" (กลุ่มสาระการเรียนรู้, จุดนัดรับ: ห้องพักครูกลุ่มสาระต่างๆ กับ อาคารนัดรับ) -->
+          <div id="preTeacherFieldsBlock" style="display: none;">
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-school"></i> กลุ่มสาระการเรียนรู้ *</label>
+              <select id="preTeacherDept" class="form-select" onchange="syncTeacherLocation(this.value, true)">
+                <option value="กลุ่มสาระการเรียนรู้การงานอาชีพ">กลุ่มสาระการเรียนรู้การงานอาชีพ</option>
+                <option value="กลุ่มสาระการเรียนรู้ภาษาไทย">กลุ่มสาระการเรียนรู้ภาษาไทย</option>
+                <option value="กลุ่มสาระการเรียนรู้คณิตศาสตร์">กลุ่มสาระการเรียนรู้คณิตศาสตร์</option>
+                <option value="กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี">กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี</option>
+                <option value="กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม">กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนา และวัฒนธรรม</option>
+                <option value="กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา">กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา</option>
+                <option value="กลุ่มสาระการเรียนรู้ศิลปะ">กลุ่มสาระการเรียนรู้ศิลปะ</option>
+                <option value="กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ">กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ</option>
+                <option value="กิจกรรมพัฒนาผู้เรียน / แนะแนว">กิจกรรมพัฒนาผู้เรียน / แนะแนว</option>
+                <option value="ฝ่ายบริหาร / บุคลากรทั่วไป">ฝ่ายบริหาร / บุคลากรทั่วไป</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-door-open"></i> จุดนัดรับ (ห้องพักครูกลุ่มสาระต่างๆ) *</label>
+                <select id="preTeacherLocationSelect" class="form-select">
+                  <option value="ห้องพักครูกลุ่มสาระการงานอาชีพ">ห้องพักครูกลุ่มสาระการงานอาชีพ</option>
+                  <option value="ห้องพักครูกลุ่มสาระภาษาไทย">ห้องพักครูกลุ่มสาระภาษาไทย</option>
+                  <option value="ห้องพักครูกลุ่มสาระคณิตศาสตร์">ห้องพักครูกลุ่มสาระคณิตศาสตร์</option>
+                  <option value="ห้องพักครูกลุ่มสาระวิทยาศาสตร์และเทคโนโลยี">ห้องพักครูกลุ่มสาระวิทยาศาสตร์และเทคโนโลยี</option>
+                  <option value="ห้องพักครูกลุ่มสาระสังคมศึกษาฯ">ห้องพักครูกลุ่มสาระสังคมศึกษาฯ</option>
+                  <option value="ห้องพักครูกลุ่มสาระสุขศึกษาและพลศึกษา">ห้องพักครูกลุ่มสาระสุขศึกษาและพลศึกษา</option>
+                  <option value="ห้องพักครูกลุ่มสาระศิลปะ">ห้องพักครูกลุ่มสาระศิลปะ</option>
+                  <option value="ห้องพักครูกลุ่มสาระภาษาต่างประเทศ">ห้องพักครูกลุ่มสาระภาษาต่างประเทศ</option>
+                  <option value="ห้องพักครูแนะแนว / กิจกรรมพัฒนาผู้เรียน">ห้องพักครูแนะแนว / กิจกรรมพัฒนาผู้เรียน</option>
+                  <option value="ห้องสำนักงาน / ฝ่ายบริหาร">ห้องสำนักงาน / ฝ่ายบริหาร</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label"><i class="fa-solid fa-building"></i> อาคารนัดรับ</label>
+                <select id="preTeacherBuildingSelect" class="form-select">
+                  <option value="">-- เลือกอาคารนัดรับ (หรือระบุ) --</option>
+                  <option value="อาคาร 1">อาคาร 1</option>
+                  <option value="อาคาร 2">อาคาร 2</option>
+                  <option value="อาคาร 3">อาคาร 3</option>
+                  <option value="อาคาร 4">อาคาร 4</option>
+                  <option value="อาคาร 5">อาคาร 5</option>
+                  <option value="อาคารอำนวยการ / เฉลิมพระเกียรติ">อาคารอำนวยการ / เฉลิมพระเกียรติ</option>
+                  <option value="อาคารอเนกประสงค์ / โรงอาหาร">อาคารอเนกประสงค์ / โรงอาหาร</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-location-pin"></i> รายละเอียดอาคาร / ห้องนัดรับเพิ่มเติม (ถ้ามี)</label>
+              <input type="text" id="preTeacherBuildingDetail" class="form-input" placeholder="เช่น ชั้น 2 ห้อง 215 หรือ โต๊ะทำงานครู">
+            </div>
+          </div>
+
+          <!-- 5. เบอร์โทรศัพท์ของผู้สั่งจอง (จำเป็นต้องกรอก) -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-phone"></i> เบอร์โทรศัพท์ของผู้สั่งจอง (จำเป็นต้องกรอก) *</label>
+            <input type="tel" id="preCustPhone" class="form-input" placeholder="เช่น 0812345678 (ใช้สำหรับติดต่อเมื่อสินค้าพร้อมรับ)" required>
+          </div>
+
+          <!-- 6. ช่องทางรับแจ้งเตือนเมื่อสินค้าพร้อมรับ -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-bell"></i> ช่องทางรับแจ้งเตือนเมื่อสินค้าพร้อมรับ *</label>
+              <select id="preNotifyChannel" class="form-select" onchange="handleNotifyChannelChange()" required>
+                <option value="LINE">LINE (Line ID)</option>
+                <option value="Instagram">Instagram (IG Username)</option>
+                <option value="SMS">ข้อความ SMS / โทรศัพท์</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label">ห้อง</label>
-              <input type="text" id="preCustRoom" class="form-input" placeholder="1">
+              <label class="form-label" id="notifyAccountLabel"><i class="fa-brands fa-line" style="color: #06c755;"></i> Line ID หรือ เบอร์โทร *</label>
+              <input type="text" id="preNotifyAccount" class="form-input" placeholder="เช่น @somchai หรือ somchai_123" required>
             </div>
-            <div class="form-group">
-              <label class="form-label">เบอร์โทรศัพท์ *</label>
-              <input type="tel" id="preCustPhone" class="form-input" placeholder="0812345678" required>
-            </div>
+          </div>
+
+          <!-- 7. หมายเหตุเพิ่มเติม -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-pen"></i> หมายเหตุเพิ่มเติม (ถ้ามี)</label>
+            <input type="text" id="preCustNote" class="form-input" placeholder="เช่น ขอรับช่วงพักเที่ยง หรือระบุสี/รสชาติ">
           </div>
 
           <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
             <button type="button" class="btn btn-secondary" onclick="closePreorderModal()">ยกเลิก</button>
-            <button type="submit" class="btn btn-primary">ส่งรายการจอง</button>
+            <button type="submit" class="btn btn-primary" id="submitPreorderBtn">
+              <i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง
+            </button>
           </div>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- 5. Contact / Question Modal -->
+  <!-- Modal 5: Contact Modal -->
   <div class="modal-overlay" id="contactModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -334,19 +837,187 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-content">
-      <p style="font-weight: 600; color: var(--primary-dark);">🌱 ระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ (CareerShop)</p>
-      <p>จำหน่ายผลผลิต งานฝีมือ และอุปกรณ์การเรียน | สนับสนุนการเรียนรู้และทักษะอาชีพนักเรียน</p>
-      <p style="font-size: 0.8rem; color: var(--text-light);">© 2026 CareerShop. กลุ่มสาระการเรียนรู้การงานอาชีพ</p>
+  <!-- Modal 6: Admin Login Gate (กรอกรหัสผ่านอะไรก็ได้ แต่ถ้ากดส่งแล้วถูกต้องจึงเข้าหน้าได้ ถ้าผิดเด้งกลับหน้าผู้ซื้อ) -->
+  <div class="modal-overlay" id="adminAuthModal" style="z-index: 99999; backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.85);">
+    <div class="modal-card" id="adminAuthCard" style="max-width: 440px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
+      <div class="modal-header" style="background: linear-gradient(135deg, #0c4a6e, #0284c7); color: #fff;">
+        <div class="modal-title" style="color: #fff;">
+          <i class="fa-solid fa-lock"></i> เข้าสู่ระบบเฉพาะครู/ผู้ขาย
+        </div>
+        <button class="close-btn" style="color: #fff;" onclick="closeAdminAuthModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.75rem;">
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
+          หน้าระบบจัดการร้านค้าสงวนไว้สำหรับครูผู้สอนและผู้ดูแลระบบหมวดการงานอาชีพเท่านั้น กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน
+        </p>
+        <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านเข้าแดชบอร์ด (ค่าเริ่มต้น: admin1234)" autofocus required>
+          </div>
+          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.88rem; margin-top: -0.5rem; margin-bottom: 1rem; display: none; background: #fef2f2; padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--danger);">
+            <i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กำลังนำท่านกลับสู่หน้าร้านค้าผู้ซื้อ...
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+            <button type="submit" class="btn btn-primary btn-block" style="padding: 0.75rem;">
+              <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด
+            </button>
+            <button type="button" class="btn btn-secondary btn-block" onclick="closeAdminAuthModal()">
+              <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าผู้ซื้อ
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </footer>
+  </div>
+
+  <!-- Modal 7: Add / Edit Product (for Seller) -->
+  <div class="modal-overlay" id="productModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="productModalTitle">
+          <i class="fa-solid fa-box-open"></i> เพิ่มสินค้าใหม่
+        </div>
+        <button class="close-btn" onclick="closeProductModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="productForm" onsubmit="handleProductFormSubmit(event)">
+          <input type="hidden" id="editProductId">
+
+          <div class="form-group">
+            <label class="form-label">ชื่อสินค้า *</label>
+            <input type="text" id="prodNameInput" class="form-input" placeholder="เช่น คุกกี้เนยสด, ชุดปลูกผัก" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">หมวดหมู่ *</label>
+              <select id="prodCatInput" class="form-select" required>
+                <option value="งานคหกรรม/เบเกอรี่">งานคหกรรม/เบเกอรี่</option>
+                <option value="งานเกษตร/ผลผลิต">งานเกษตร/ผลผลิต</option>
+                <option value="งานช่าง/งานประดิษฐ์">งานช่าง/งานประดิษฐ์</option>
+                <option value="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</option>
+                <option value="ทั่วไป">ทั่วไป</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ราคา (บาท) *</label>
+              <input type="number" id="prodPriceInput" class="form-input" min="1" placeholder="35" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">จำนวนสต็อก *</label>
+              <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="30" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ลิงก์รูปภาพ (URL)</label>
+              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">คำอธิบายสินค้า</label>
+            <textarea id="prodDescInput" class="form-textarea" rows="3" placeholder="รายละเอียดผลงาน ฝีมือนักเรียน..."></textarea>
+          </div>
+
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeProductModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary" id="saveProductBtn">บันทึกสินค้า</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 8: Reply Message (for Seller) -->
+  <div class="modal-overlay" id="replyModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-reply"></i> ตอบกลับข้อความ
+        </div>
+        <button class="close-btn" onclick="closeReplyModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="replyForm" onsubmit="handleReplySubmit(event)">
+          <input type="hidden" id="replyMessageId">
+          <div class="form-group">
+            <label class="form-label">ข้อความจากผู้สอบถาม:</label>
+            <div id="replyOriginalMsg" style="background: #f1f5f9; padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.9rem;"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ข้อความตอบกลับ *</label>
+            <textarea id="replyTextInput" class="form-textarea" rows="3" placeholder="พิมพ์ข้อความตอบกลับที่นี่..." required></textarea>
+          </div>
+          <div class="modal-footer" style="padding-left: 0; padding-right: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeReplyModal()">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">ส่งคำตอบ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 9: Notify Buyer (Preorder Ready) (for Seller) -->
+  <div class="modal-overlay" id="notifyBuyerModal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff;">
+        <div class="modal-title" style="color: #fff;">
+          <i class="fa-solid fa-bell"></i> ส่งแจ้งเตือนกำหนดรับสินค้าให้ผู้ซื้อ
+        </div>
+        <button class="close-btn" style="color: #fff;" onclick="closeNotifyBuyerModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="notifyBuyerPreorderId">
+
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <strong>ผู้รับ: <span id="notifyBuyerName" style="color: var(--primary);">-</span></strong>
+            <span id="notifyBuyerClass" style="font-size: 0.85rem; color: var(--text-muted);">-</span>
+          </div>
+          <div style="font-size: 0.9rem; margin-bottom: 0.35rem;">
+            📦 สินค้าที่จอง: <strong id="notifyBuyerProduct">-</strong> (<span id="notifyBuyerQty">1</span> ชิ้น)
+          </div>
+          <div style="font-size: 0.9rem; margin-bottom: 0.35rem;">
+            📅 วันกำหนดรับของ: <strong id="notifyBuyerDate" style="color: #d97706;">-</strong>
+          </div>
+          <div style="font-size: 0.9rem;">
+            📲 ช่องทางที่ผู้ซื้อระบุไว้: <span id="notifyBuyerChannelBadge" class="badge badge-preparing">-</span>
+            <strong id="notifyBuyerContact" style="color: var(--text-main); margin-left: 0.5rem;">-</strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ข้อความแจ้งเตือน (สามารถแก้ไขได้):</label>
+          <textarea id="notifyBuyerMessageText" class="form-textarea" rows="4"></textarea>
+        </div>
+
+        <!-- Action buttons according to channel -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+          <div id="notifyActionButtons" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <!-- Injected dynamically based on LINE, IG, SMS -->
+          </div>
+          <button class="btn btn-secondary" onclick="copyNotifyText()">
+            <i class="fa-solid fa-copy"></i> คัดลอกข้อความแจ้งเตือน
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeNotifyBuyerModal()">ปิดหน้าต่าง</button>
+        <button type="button" class="btn btn-success" onclick="markPreorderAsNotified()">
+          <i class="fa-solid fa-check"></i> บันทึกว่าส่งแจ้งเตือนแล้ว
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Scripts -->
+  <!-- Scripts: Load seller.js first so its functions are available, then app.js -->
+  <script src="seller.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -82,13 +82,15 @@ function setupDatabase() {
       "student_room",
       "student_no",
       "phone",
+      "notify_channel",
+      "notify_account",
       "product_name",
       "quantity",
-      "expected_date",
+      "delivery_date",
       "status",
       "note"
     ]);
-    preSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#e0f2fe");
+    preSheet.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#e0f2fe");
   }
 
   // 4. ตาราง Messages
@@ -169,6 +171,9 @@ function doPost(e) {
       case "createPreorder":
         return jsonResponse(createPreorder(ss, data));
 
+      case "setPreorderDeliveryDate":
+        return jsonResponse(setPreorderDeliveryDate(ss, data.preorder_id, data.delivery_date, data.status));
+
       case "updatePreorderStatus":
         return jsonResponse(updatePreorderStatus(ss, data.preorder_id, data.status));
 
@@ -186,6 +191,9 @@ function doPost(e) {
 
       case "replyMessage":
         return jsonResponse(replyMessage(ss, data.message_id, data.reply));
+
+      case "testLineNotify":
+        return jsonResponse(testLineNotification(data.tokens || data.seller_token));
 
       default:
         return jsonResponse({ success: false, message: "Unknown POST action: " + action });
@@ -320,20 +328,27 @@ function createOrder(ss, orderData) {
 
   const itemsJson = typeof orderData.items === "string" ? orderData.items : JSON.stringify(orderData.items || []);
 
+  const isTeacher = orderData.buyer_type === "ครู" || orderData.buyer_type === "คุณครู" || orderData.buyer_type === "teacher";
+  const name = orderData.student_name || orderData.name || "";
+  const className = isTeacher ? ("ครู: " + (orderData.department || "กลุ่มสาระการงานอาชีพ")) : (orderData.student_class || "");
+  const room = isTeacher ? (orderData.department || "ห้องพักครู") : (orderData.student_room || "");
+  const no = isTeacher ? "-" : (orderData.student_no || "");
+  const note = (isTeacher ? "[ผู้สั่ง: คุณครู/บุคลากร] " : "") + (orderData.note || "");
+
   sheet.appendRow([
     orderId,
     dateStr,
-    orderData.student_name || "",
-    orderData.student_class || "",
-    orderData.student_room || "",
-    orderData.student_no || "",
+    name,
+    className,
+    room,
+    no,
     orderData.phone || "",
-    orderData.pickup_location || "ห้องพักครูหมวดการงานอาชีพ",
+    orderData.pickup_location || (isTeacher ? "ห้องพักครู" : "ห้องพักครูหมวดการงานอาชีพ"),
     itemsJson,
     Number(orderData.total_price) || 0,
     "Cash on Delivery (COD)",
     "รอดำเนินการ",
-    orderData.note || ""
+    note
   ]);
 
   // ตัดสต็อกสินค้าอัตโนมัติ
@@ -344,6 +359,13 @@ function createOrder(ss, orderData) {
       const parsedItems = JSON.parse(orderData.items);
       deductStock(ss, parsedItems);
     } catch (e) {}
+  }
+
+  // ส่งแจ้งเตือนคำสั่งซื้อใหม่ไปยัง LINE ครู/แอดมิน
+  try {
+    notifySellerNewOrder(orderData, orderId);
+  } catch (err) {
+    Logger.log("Notify order error: " + err);
   }
 
   return { success: true, order_id: orderId, message: "Order placed successfully" };
@@ -406,14 +428,45 @@ function createPreorder(ss, data) {
     data.student_room || "",
     data.student_no || "",
     data.phone || "",
+    data.notify_channel || "SMS",
+    data.notify_account || data.phone || "",
     data.product_name || "",
     Number(data.quantity) || 1,
-    data.expected_date || "",
-    "รอดำเนินการ",
+    data.delivery_date || "รอคุณครูกำหนดวัน",
+    "รอดำเนินการ (รอครูกำหนดวัน)",
     data.note || ""
   ]);
 
+  // ส่งแจ้งเตือนไปยังผู้ขาย (LINE Notify / Webhook หากมีการตั้งค่าไว้)
+  try {
+    notifySellerNewPreorder(data, preId);
+  } catch (err) {
+    Logger.log("Notify seller error: " + err);
+  }
+
   return { success: true, preorder_id: preId, message: "Preorder saved successfully" };
+}
+
+function setPreorderDeliveryDate(ss, preorderId, deliveryDate, status) {
+  const sheet = ss.getSheetByName(SHEET_PREORDERS);
+  if (!sheet) throw new Error("Preorders sheet not found");
+
+  const data = sheet.getDataRange().getValues();
+  const idCol = 0;
+  const deliveryDateCol = 11; // Col L (index 11)
+  const statusCol = 12; // Col M (index 12)
+
+  for (let r = 1; r < data.length; r++) {
+    if (String(data[r][idCol]) === String(preorderId)) {
+      sheet.getRange(r + 1, deliveryDateCol + 1).setValue(deliveryDate);
+      if (status) {
+        sheet.getRange(r + 1, statusCol + 1).setValue(status);
+      }
+      return { success: true, message: "Delivery date set to " + deliveryDate };
+    }
+  }
+
+  return { success: false, message: "Preorder not found" };
 }
 
 function updatePreorderStatus(ss, preorderId, newStatus) {
@@ -422,7 +475,7 @@ function updatePreorderStatus(ss, preorderId, newStatus) {
 
   const data = sheet.getDataRange().getValues();
   const idCol = 0;
-  const statusCol = 10; // Col K
+  const statusCol = 12; // Col M
 
   for (let r = 1; r < data.length; r++) {
     if (String(data[r][idCol]) === String(preorderId)) {
@@ -432,6 +485,107 @@ function updatePreorderStatus(ss, preorderId, newStatus) {
   }
 
   return { success: false, message: "Preorder not found" };
+}
+
+function notifySellerNewPreorder(data, preId) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const rawTokens = scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || data.seller_token || "";
+
+  if (!rawTokens) return;
+
+  const tokens = String(rawTokens).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
+  if (tokens.length === 0) return;
+
+  const buyerInfo = (data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher")
+    ? `คุณครู ${data.student_name} (${data.department || data.student_class || 'หมวดการงานฯ'})`
+    : `${data.student_name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
+
+  const msg = `\n🔔 มีรายการสั่งจองสินค้าใหม่ (หมวดการงานอาชีพ)!\nรหัส: ${preId}\nสินค้า: ${data.product_name} (${data.quantity} ชิ้น)\nผู้จอง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || '-'}\nช่องทางแจ้งเตือน: ${data.notify_channel} (${data.notify_account})\nหมายเหตุ: ${data.note || '-'}`;
+
+  tokens.forEach(token => {
+    try {
+      UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
+        method: "post",
+        headers: { "Authorization": "Bearer " + token },
+        payload: { "message": msg },
+        muteHttpExceptions: true
+      });
+    } catch (err) {
+      Logger.log("Notify preorder error for token: " + err);
+    }
+  });
+}
+
+function notifySellerNewOrder(data, orderId) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const rawTokens = scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || data.seller_token || "";
+
+  if (!rawTokens) return;
+
+  const tokens = String(rawTokens).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
+  if (tokens.length === 0) return;
+
+  const isTeacher = data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher";
+  const buyerInfo = isTeacher
+    ? `คุณครู ${data.student_name || data.name} (${data.department || 'ไม่ระบุกลุ่มสาระ'})`
+    : `${data.student_name || data.name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
+
+  const msg = `\n🛒 มีคำสั่งซื้อใหม่ (COD หมวดการงานอาชีพ)!\nรหัส: ${orderId}\nผู้สั่ง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || 'ห้องพักครู'}\nยอดรวม: ${data.total_price} บาท\nหมายเหตุ: ${data.note || '-'}`;
+
+  tokens.forEach(token => {
+    try {
+      UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
+        method: "post",
+        headers: { "Authorization": "Bearer " + token },
+        payload: { "message": msg },
+        muteHttpExceptions: true
+      });
+    } catch (err) {
+      Logger.log("Notify order error for token: " + err);
+    }
+  });
+}
+
+function testLineNotification(rawTokens) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const tokensStr = rawTokens || scriptProps.getProperty("SELLER_LINE_TOKENS") || scriptProps.getProperty("SELLER_LINE_TOKEN") || "";
+
+  if (!tokensStr) {
+    return { success: false, message: "ไม่พบ LINE Notify Token ในระบบ กรุณาระบุ Token ก่อนทดสอบ" };
+  }
+
+  const tokens = String(tokensStr).split(/[,;\n]+/).map(t => t.trim()).filter(t => t.length > 0);
+  if (tokens.length === 0) {
+    return { success: false, message: "ไม่มี Token ที่ถูกต้องสำหรับทดสอบ" };
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+
+  tokens.forEach(token => {
+    try {
+      const res = UrlFetchApp.fetch("https://notify-api.line.me/api/notify", {
+        method: "post",
+        headers: { "Authorization": "Bearer " + token },
+        payload: { "message": "\n✅ ทดสอบการเชื่อมต่อระบบแจ้งเตือนร้านค้าหมวดการงานอาชีพสำเร็จเรียบร้อย!" },
+        muteHttpExceptions: true
+      });
+      if (res.getResponseCode() === 200) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch (err) {
+      failCount++;
+    }
+  });
+
+  return {
+    success: successCount > 0,
+    message: `ส่งทดสอบสำเร็จ ${successCount} ท่าน (ล้มเหลว ${failCount} ท่าน)`,
+    successCount: successCount,
+    failCount: failCount
+  };
 }
 
 function addProduct(ss, data) {

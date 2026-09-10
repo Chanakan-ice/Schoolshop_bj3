@@ -19,7 +19,16 @@ document.addEventListener("DOMContentLoaded", () => {
     apiInput.value = GAS_API_URL;
   }
 
-  checkAdminAuth();
+  const tokenInput = document.getElementById("sellerNotifyTokenInput");
+  const savedToken = localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || localStorage.getItem("SELLER_NOTIFY_TOKEN") || "";
+  if (tokenInput && savedToken) {
+    tokenInput.value = savedToken;
+  }
+
+  // ตรวจสอบ Auth เฉพาะเมื่อเข้าผ่าน seller.html หรือ URL มี ?view=seller
+  if (window.location.pathname.includes("seller.html") || window.location.search.includes("view=seller")) {
+    checkAdminAuth();
+  }
 });
 
 // ==================== Tab Switching ====================
@@ -73,7 +82,7 @@ function renderOrdersTable(ordersToDisplay) {
   if (!tbody) return;
 
   if (ordersToDisplay.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">ยังไม่มีคำสั่งซื้อ</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">ยังไม่มีคำสั่งซื้อ</td></tr>`;
     return;
   }
 
@@ -96,26 +105,42 @@ function renderOrdersTable(ordersToDisplay) {
     else if (order.status === "สำเร็จ") badgeClass = "badge-completed";
     else if (order.status === "ยกเลิก") badgeClass = "badge-cancelled";
 
+    const isTeacher = order.buyer_type === "คุณครู" || order.buyer_type === "ครู" || order.buyer_type === "teacher" ||
+                      (order.student_class && (order.student_class.includes("ครู:") || order.student_class.includes("กลุ่มสาระ")));
+
+    const buyerBadge = isTeacher 
+      ? `<span class="badge-teacher"><i class="fa-solid fa-chalkboard-user"></i> คุณครู</span>`
+      : `<span class="badge-student"><i class="fa-solid fa-graduation-cap"></i> นักเรียน</span>`;
+
+    const buyerDetail = isTeacher
+      ? `<div style="font-size: 0.8rem; color: #047857; font-weight: 500;">${order.department || order.student_class || 'หมวดการงานฯ'}</div>`
+      : `<div style="font-size: 0.8rem; color: var(--text-muted);">${order.student_class && order.student_class !== 'นักเรียน' ? `ชั้น ${order.student_class}/${order.student_room}` : `ห้อง ${order.student_room || '-'}`} เลขที่ ${order.student_no || '-'}</div>`;
+
     return `
       <tr>
         <td><strong>${order.order_id || '-'}</strong></td>
         <td style="font-size: 0.8rem; color: var(--text-muted);">${order.timestamp || order.date || '-'}</td>
         <td>
-          <div style="font-weight: 600;">${order.student_name}</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            ชั้น ${order.student_class}/${order.student_room} เลขที่ ${order.student_no || '-'}
-            <br>โทร: <a href="tel:${order.phone}">${order.phone}</a>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            ${buyerBadge}
+            <strong>${order.student_name}</strong>
           </div>
+          ${buyerDetail}
         </td>
-        <td style="max-width: 250px; font-size: 0.85rem;">
-          ${itemsText}
-          ${order.note ? `<div style="color: var(--text-light); font-style: italic; font-size: 0.75rem;">โน้ต: ${order.note}</div>` : ''}
+        <td>
+          <a href="tel:${order.phone}" style="color: var(--primary); font-weight: 600; font-size: 0.88rem;">
+            <i class="fa-solid fa-phone"></i> ${order.phone}
+          </a>
         </td>
-        <td style="font-weight: 700; color: var(--primary);">${Number(order.total_price || 0).toLocaleString()} ฿</td>
         <td style="font-size: 0.85rem;">${order.pickup_location || '-'}</td>
+        <td style="max-width: 230px; font-size: 0.85rem;">
+          ${itemsText}
+          ${order.note ? `<div style="color: var(--text-light); font-style: italic; font-size: 0.75rem; margin-top: 2px;">โน้ต: ${order.note}</div>` : ''}
+        </td>
+        <td style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">${Number(order.total_price || 0).toLocaleString()} ฿</td>
         <td><span class="badge ${badgeClass}">${order.status || 'รอดำเนินการ'}</span></td>
         <td>
-          <select class="form-select" style="padding: 0.35rem 0.6rem; font-size: 0.85rem; width: auto;" onchange="changeOrderStatus('${order.order_id}', this.value)">
+          <select class="form-select" style="padding: 0.35rem 0.6rem; font-size: 0.82rem; width: auto;" onchange="changeOrderStatus('${order.order_id}', this.value)">
             <option value="รอดำเนินการ" ${order.status === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
             <option value="กำลังจัดเตรียม" ${order.status === 'กำลังจัดเตรียม' ? 'selected' : ''}>กำลังจัดเตรียม</option>
             <option value="พร้อมรับของ" ${order.status === 'พร้อมรับของ' ? 'selected' : ''}>พร้อมรับของ</option>
@@ -239,6 +264,7 @@ async function loadPreorders() {
       if (json.success && Array.isArray(json.data)) {
         allPreorders = json.data;
         renderPreordersTable();
+        updatePreorderBadge();
         return;
       }
     } catch (e) {}
@@ -246,6 +272,19 @@ async function loadPreorders() {
 
   allPreorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
   renderPreordersTable();
+  updatePreorderBadge();
+}
+
+function updatePreorderBadge() {
+  const badge = document.getElementById("preorderBadge");
+  if (!badge) return;
+  const pendingCount = allPreorders.filter(p => !p.status || p.status.includes("รอดำเนินการ") || !p.delivery_date || p.delivery_date === "รอคุณครูกำหนดวัน").length;
+  if (pendingCount > 0) {
+    badge.innerText = `${pendingCount} จองใหม่`;
+    badge.style.display = "inline-block";
+  } else {
+    badge.style.display = "none";
+  }
 }
 
 function renderPreordersTable() {
@@ -253,29 +292,123 @@ function renderPreordersTable() {
   if (!tbody) return;
 
   if (allPreorders.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งจอง</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งจอง</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = allPreorders.map(pre => `
-    <tr>
-      <td><strong>${pre.preorder_id || '-'}</strong></td>
-      <td style="font-size: 0.8rem; color: var(--text-muted);">${pre.timestamp || '-'}</td>
-      <td><strong>${pre.student_name}</strong> (ชั้น ${pre.student_class || '-'}/${pre.student_room || '-'})</td>
-      <td><a href="tel:${pre.phone}">${pre.phone}</a></td>
-      <td style="font-weight: 600; color: var(--primary);">${pre.product_name}</td>
-      <td>${pre.quantity}</td>
-      <td>${pre.expected_date || '-'}</td>
-      <td><span class="badge ${pre.status === 'ส่งมอบแล้ว' ? 'badge-completed' : 'badge-pending'}">${pre.status || 'รอดำเนินการ'}</span></td>
-      <td>
-        <select class="form-select" style="padding: 0.35rem 0.6rem; font-size: 0.85rem; width: auto;" onchange="changePreorderStatus('${pre.preorder_id}', this.value)">
-          <option value="รอดำเนินการ" ${pre.status === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
-          <option value="ของมาถึงแล้ว" ${pre.status === 'ของมาถึงแล้ว' ? 'selected' : ''}>ของมาถึงแล้ว</option>
-          <option value="ส่งมอบแล้ว" ${pre.status === 'ส่งมอบแล้ว' ? 'selected' : ''}>ส่งมอบแล้ว</option>
-        </select>
-      </td>
-    </tr>
-  `).join("");
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  tbody.innerHTML = allPreorders.map(pre => {
+    const channel = pre.notify_channel || "SMS";
+    const account = pre.notify_account || pre.phone;
+    let channelBadge = "";
+
+    if (channel === "LINE") {
+      channelBadge = `<span class="badge" style="background: #e7f9ee; color: #06c755; border: 1px solid #bbf7d0;"><i class="fa-brands fa-line"></i> LINE: <strong>${account}</strong></span>`;
+    } else if (channel === "Instagram") {
+      channelBadge = `<span class="badge" style="background: #fdf2f8; color: #e1306c; border: 1px solid #fbcfe8;"><i class="fa-brands fa-instagram"></i> IG: <strong>${account}</strong></span>`;
+    } else {
+      channelBadge = `<span class="badge" style="background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd;"><i class="fa-solid fa-message"></i> SMS: <strong>${account}</strong></span>`;
+    }
+
+    let badgeClass = "badge-pending";
+    if (pre.status && pre.status.includes("พร้อมรับ") || pre.status && pre.status.includes("แจ้งเตือนแล้ว")) badgeClass = "badge-ready";
+    else if (pre.status === "ส่งมอบแล้ว") badgeClass = "badge-completed";
+    else if (pre.status === "ยกเลิก") badgeClass = "badge-cancelled";
+
+    const isTeacher = pre.student_class && (pre.student_class.includes("ครู") || pre.student_class.includes("กลุ่มสาระ"));
+    const buyerBadge = isTeacher 
+      ? `<span class="badge-teacher"><i class="fa-solid fa-chalkboard-user"></i> คุณครู</span>`
+      : `<span class="badge-student"><i class="fa-solid fa-graduation-cap"></i> นักเรียน</span>`;
+
+    const hasDate = pre.delivery_date && pre.delivery_date !== 'รอคุณครูกำหนดวัน';
+    const isDue = hasDate && pre.delivery_date <= todayStr && (!pre.status || !pre.status.includes("ส่งมอบแล้ว"));
+
+    return `
+      <tr style="${isDue ? 'background-color: #fffbeb;' : ''}">
+        <td><strong>${pre.preorder_id || '-'}</strong></td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${pre.timestamp || '-'}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            ${buyerBadge}
+            <strong>${pre.student_name}</strong>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            ${isTeacher 
+              ? `<span style="color: #047857; font-weight: 500;">${pre.department || pre.student_class || 'หมวดการงานฯ'}</span><br>จุดนัดรับ: ${pre.pickup_location || 'ห้องพักครู'}`
+              : `ห้อง ${pre.student_room || '-'}${pre.student_no ? ` เลขที่ ${pre.student_no}` : ''}<br>จุดนัดรับ: ${pre.pickup_location || 'หมวดการงานอาชีพ'}`
+            }
+            <br>โทร: <a href="tel:${pre.phone}" style="color: var(--primary); font-weight: 600;">${pre.phone}</a>
+          </div>
+        </td>
+        <td>${channelBadge}</td>
+        <td>
+          <div style="font-weight: 600; color: var(--primary);">${pre.product_name}</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">จำนวน: <strong>${pre.quantity}</strong> ชิ้น</div>
+          ${pre.note ? `<div style="font-size: 0.75rem; color: var(--text-light); font-style: italic;">โน้ต: ${pre.note}</div>` : ''}
+        </td>
+        <td>
+          <input type="date" class="form-input" style="padding: 0.3rem 0.5rem; font-size: 0.85rem; width: 140px; margin-bottom: 4px;" 
+                 value="${hasDate ? pre.delivery_date : ''}" 
+                 onchange="saveDeliveryDate('${pre.preorder_id}', this.value)">
+          <div style="font-size: 0.78rem; color: #b45309;">
+            ${hasDate ? `📅 นัดรับ: <strong>${pre.delivery_date}</strong>` : '⚠️ ยังไม่ได้กำหนดวัน'}
+          </div>
+          ${isDue ? `<div style="margin-top: 4px;"><span class="badge-due"><i class="fa-solid fa-bell"></i> ถึงกำหนดส่งมอบแล้ว</span></div>` : ''}
+        </td>
+        <td><span class="badge ${badgeClass}">${pre.status || 'รอดำเนินการ'}</span></td>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+            <button class="btn btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;" onclick="openNotifyBuyerModal('${pre.preorder_id}')">
+              <i class="fa-solid fa-bell"></i> ส่งแจ้งเตือน
+            </button>
+            <select class="form-select" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; width: auto;" onchange="changePreorderStatus('${pre.preorder_id}', this.value)">
+              <option value="รอดำเนินการ" ${pre.status && pre.status.includes('รอดำเนินการ') ? 'selected' : ''}>รอดำเนินการ</option>
+              <option value="กำหนดวันรับแล้ว" ${pre.status && pre.status.includes('กำหนดวันรับแล้ว') ? 'selected' : ''}>กำหนดวันรับแล้ว</option>
+              <option value="แจ้งเตือนแล้ว (พร้อมรับของ)" ${pre.status && pre.status.includes('แจ้งเตือนแล้ว') ? 'selected' : ''}>แจ้งเตือนแล้ว (พร้อมรับของ)</option>
+              <option value="ส่งมอบแล้ว" ${pre.status === 'ส่งมอบแล้ว' ? 'selected' : ''}>ส่งมอบแล้ว</option>
+              <option value="ยกเลิก" ${pre.status === 'ยกเลิก' ? 'selected' : ''}>ยกเลิก</option>
+            </select>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function saveDeliveryDate(preorderId, dateVal) {
+  if (!dateVal) return;
+  showToast(`กำลังบันทึกวันจัดส่ง (${dateVal})...`, "info");
+
+  const newStatus = `กำหนดวันรับแล้ว (${dateVal})`;
+
+  if (GAS_API_URL) {
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "setPreorderDeliveryDate",
+          preorder_id: preorderId,
+          delivery_date: dateVal,
+          status: newStatus
+        })
+      });
+    } catch (e) {
+      console.warn("GAS date save error:", e);
+    }
+  }
+
+  const found = allPreorders.find(p => String(p.preorder_id) === String(preorderId));
+  if (found) {
+    found.delivery_date = dateVal;
+    found.status = newStatus;
+    localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(allPreorders));
+  }
+
+  renderPreordersTable();
+  updatePreorderBadge();
+  showToast(`กำหนดวันรับสินค้าวันที่ ${dateVal} เรียบร้อยแล้ว`, "success");
 }
 
 async function changePreorderStatus(preorderId, newStatus) {
@@ -295,6 +428,7 @@ async function changePreorderStatus(preorderId, newStatus) {
     localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(allPreorders));
   }
   renderPreordersTable();
+  updatePreorderBadge();
   showToast("อัปเดตสถานะการสั่งจองแล้ว", "success");
 }
 
@@ -554,40 +688,71 @@ function showToast(message, type = "info") {
 
 // ==================== Admin Authentication ====================
 function checkAdminAuth() {
-  const isAuth = sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
+  const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" || sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
   const authModal = document.getElementById("adminAuthModal");
   if (!isAuth) {
     if (authModal) authModal.classList.add("active");
   } else {
     if (authModal) authModal.classList.remove("active");
+    if (typeof showSellerView === "function") {
+      showSellerView();
+    }
     refreshAllData();
   }
 }
 
 function handleAdminLogin(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   const input = document.getElementById("adminPasswordInput");
   const errorEl = document.getElementById("authErrorMsg");
-  const currentPassword = localStorage.getItem("CAREER_ADMIN_PASSWORD") || "admin1234";
+  const card = document.getElementById("adminAuthCard");
+  const enteredPass = input ? input.value : "";
+  const currentPassword = localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "admin1234";
 
-  if (input.value === currentPassword) {
+  if (enteredPass === currentPassword) {
+    sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
     sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
-    document.getElementById("adminAuthModal").classList.remove("active");
+    const modal = document.getElementById("adminAuthModal");
+    if (modal) modal.classList.remove("active");
     if (errorEl) errorEl.style.display = "none";
-    showToast("เข้าสู่ระบบสำเร็จ ยินดีต้อนรับครับ", "success");
+    if (input) input.value = "";
+    showToast("เข้าสู่ระบบแดชบอร์ดผู้ขายสำเร็จ", "success");
+    if (typeof showSellerView === "function") {
+      showSellerView();
+    }
     refreshAllData();
   } else {
+    // รหัสผ่านไม่ถูกต้อง -> "ถ้ากดเข้าหน้าแอดมินแต่กรอกรหัสไม่ได้ก้ให้เด้งมาหน้าผู้ซื้อเหมือนเดิม"
     if (errorEl) errorEl.style.display = "block";
-    input.value = "";
-    input.focus();
-    showToast("รหัสผ่านไม่ถูกต้อง", "error");
+    if (card) {
+      card.classList.add("shake-anim");
+      setTimeout(() => card.classList.remove("shake-anim"), 450);
+    }
+    showToast("รหัสผ่านไม่ถูกต้อง! กำลังนำท่านกลับสู่หน้าร้านค้าผู้ซื้อ...", "error");
+
+    setTimeout(() => {
+      const modal = document.getElementById("adminAuthModal");
+      if (modal) modal.classList.remove("active");
+      if (input) input.value = "";
+      if (errorEl) errorEl.style.display = "none";
+      if (typeof showBuyerView === "function") {
+        showBuyerView();
+      } else {
+        window.location.href = "index.html";
+      }
+    }, 1100);
   }
 }
 
 function logoutAdmin() {
+  sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
   sessionStorage.removeItem("CAREER_ADMIN_AUTH");
   showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
-  window.location.href = "index.html";
+  if (typeof showBuyerView === "function") {
+    showBuyerView();
+  } else {
+    window.location.href = "index.html";
+  }
 }
 
 function changeAdminPassword() {
@@ -607,9 +772,140 @@ function changeAdminPassword() {
     return;
   }
 
+  localStorage.setItem("SCHOOLSHOP_ADMIN_PASS", newPass);
   localStorage.setItem("CAREER_ADMIN_PASSWORD", newPass);
   document.getElementById("newAdminPasswordInput").value = "";
   document.getElementById("confirmAdminPasswordInput").value = "";
   showToast("เปลี่ยนรหัสผ่านแอดมินสำเร็จแล้ว", "success");
 }
+
+function saveSellerNotifyToken() {
+  const token = document.getElementById("sellerNotifyTokenInput").value.trim();
+  localStorage.setItem("SCHOOLSHOP_SELLER_LINE_TOKENS", token);
+  localStorage.setItem("SCHOOLSHOP_SELLER_LINE_TOKEN", token);
+  localStorage.setItem("SELLER_NOTIFY_TOKEN", token);
+  showToast("บันทึกการตั้งค่าแจ้งเตือน LINE ผู้ขายเรียบร้อยแล้ว", "success");
+}
+
+async function testSellerLineTokens() {
+  const tokenInput = document.getElementById("sellerNotifyTokenInput");
+  const tokens = tokenInput ? tokenInput.value.trim() : (localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || "");
+
+  if (!tokens) {
+    showToast("กรุณาระบุ LINE Notify Token ก่อนกดทดสอบครับ", "error");
+    return;
+  }
+
+  showToast("กำลังส่งข้อความทดสอบไปยังทุก LINE Token...", "info");
+
+  if (GAS_API_URL) {
+    try {
+      const res = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "testLineNotify", tokens: tokens })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ ${json.message}`, "success");
+        return;
+      } else {
+        showToast(`⚠️ ${json.message || 'ส่งทดสอบล้มเหลว'}`, "error");
+        return;
+      }
+    } catch (e) {
+      console.warn("Test notify error:", e);
+    }
+  }
+
+  showToast("บันทึก Token เรียบร้อยแล้ว (จะส่งผ่าน GAS เมื่อเชื่อมต่อ Web App URL)", "info");
+}
+
+// ==================== Preorder Notification Modal ====================
+function openNotifyBuyerModal(preorderId) {
+  const pre = allPreorders.find(p => String(p.preorder_id) === String(preorderId));
+  if (!pre) return;
+
+  document.getElementById("notifyBuyerPreorderId").value = pre.preorder_id;
+  const isTeacher = pre.student_class && (pre.student_class.includes("ครู") || pre.student_class.includes("กลุ่มสาระ"));
+  document.getElementById("notifyBuyerClass").innerText = isTeacher 
+    ? (pre.student_class || "คุณครู/บุคลากร") 
+    : (pre.student_class && pre.student_class !== 'นักเรียน' ? `ชั้น ${pre.student_class}/${pre.student_room || '-'}` : `ห้อง ${pre.student_room || '-'} เลขที่ ${pre.student_no || '-'}`);
+  document.getElementById("notifyBuyerProduct").innerText = pre.product_name || "-";
+  document.getElementById("notifyBuyerQty").innerText = pre.quantity || "1";
+
+  const deliveryDateText = pre.delivery_date && pre.delivery_date !== "รอคุณครูกำหนดวัน" 
+    ? pre.delivery_date 
+    : "วันนี้เป็นต้นไป";
+  document.getElementById("notifyBuyerDate").innerText = deliveryDateText;
+
+  const channel = pre.notify_channel || "SMS";
+  const contact = pre.notify_account || pre.phone;
+  const channelBadge = document.getElementById("notifyBuyerChannelBadge");
+  channelBadge.innerText = channel;
+  document.getElementById("notifyBuyerContact").innerText = contact;
+
+  // Pre-fill message with pickup location
+  const greeting = isTeacher ? `เรียน คุณครู${pre.student_name}` : `สวัสดีครับน้อง ${pre.student_name}`;
+  const pickupLoc = pre.pickup_location || (isTeacher ? 'ห้องพักครูกลุ่มสาระการงานอาชีพ' : 'หมวดการงานอาชีพ');
+  const msgTemplate = `${greeting} จากร้านค้าหมวดการงานอาชีพครับ แจ้งเตือนสินค้าที่สั่งจอง [${pre.product_name} x ${pre.quantity} ชิ้น] พร้อมให้มารับของแล้วในวันที่ ${deliveryDateText} ณ ${pickupLoc} ครับ (รหัสการจอง: ${pre.preorder_id})`;
+  document.getElementById("notifyBuyerMessageText").value = msgTemplate;
+
+  // Build Action Buttons
+  const btnContainer = document.getElementById("notifyActionButtons");
+  let actionButtonsHtml = "";
+
+  if (channel === "LINE") {
+    const cleanLineId = contact.replace("@", "").trim();
+    actionButtonsHtml = `
+      <a href="https://line.me/R/ti/p/~${cleanLineId}" target="_blank" class="btn" style="background: #06c755; color: #fff; flex: 1;">
+        <i class="fa-brands fa-line"></i> เปิดแชท LINE (${contact})
+      </a>
+    `;
+  } else if (channel === "Instagram") {
+    const cleanIg = contact.replace("@", "").trim();
+    actionButtonsHtml = `
+      <a href="https://ig.me/m/${cleanIg}" target="_blank" class="btn" style="background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045); color: #fff; flex: 1;">
+        <i class="fa-brands fa-instagram"></i> ส่งข้อความ IG Direct (@${cleanIg})
+      </a>
+    `;
+  } else {
+    const cleanPhone = contact.replace(/[^0-9]/g, "");
+    actionButtonsHtml = `
+      <a href="sms:${cleanPhone}?body=${encodeURIComponent(msgTemplate)}" class="btn btn-primary" style="flex: 1;">
+        <i class="fa-solid fa-message"></i> ส่งข้อความ SMS
+      </a>
+      <a href="tel:${cleanPhone}" class="btn btn-secondary">
+        <i class="fa-solid fa-phone"></i> โทรหาผู้ซื้อ
+      </a>
+    `;
+  }
+
+  btnContainer.innerHTML = actionButtonsHtml;
+  document.getElementById("notifyBuyerModal").classList.add("active");
+}
+
+function closeNotifyBuyerModal() {
+  document.getElementById("notifyBuyerModal").classList.remove("active");
+}
+
+function copyNotifyText() {
+  const text = document.getElementById("notifyBuyerMessageText").value;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast("คัดลอกข้อความแจ้งเตือนแล้ว นำไปวางในแชทได้เลยครับ", "success");
+  }).catch(() => {
+    showToast("คัดลอกไม่สำเร็จ กรุณาเลือกข้อความแล้วกดคัดลอกด้วยตนเอง", "error");
+  });
+}
+
+async function markPreorderAsNotified() {
+  const preId = document.getElementById("notifyBuyerPreorderId").value;
+  if (!preId) return;
+
+  const newStatus = "แจ้งเตือนแล้ว (พร้อมรับของ)";
+  await changePreorderStatus(preId, newStatus);
+  closeNotifyBuyerModal();
+  showToast("บันทึกสถานะแจ้งเตือนเรียบร้อยแล้ว", "success");
+}
+
 
