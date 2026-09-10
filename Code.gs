@@ -192,6 +192,12 @@ function doPost(e) {
       case "replyMessage":
         return jsonResponse(replyMessage(ss, data.message_id, data.reply));
 
+      case "testEmail":
+        return jsonResponse(testEmailNotification(data.emails));
+
+      case "saveEmailSettings":
+        return jsonResponse(saveEmailSettingsToProperties(data.emails));
+
       case "testLineNotify":
         return jsonResponse(testLineNotification(data.tokens || data.seller_token));
 
@@ -494,6 +500,339 @@ function updatePreorderStatus(ss, preorderId, newStatus) {
 }
 
 /**
+ * ==============================================================================
+ * ระบบแจ้งเตือนทางอีเมล (Email Notification System) สำหรับคุณครู/แอดมิน
+ * ==============================================================================
+ */
+
+/**
+ * บันทึกรายการอีเมลแอดมินลงใน Script Properties
+ */
+function saveEmailSettingsToProperties(emails) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  if (emails !== undefined) {
+    scriptProps.setProperty("ADMIN_EMAILS", String(emails).trim());
+  }
+  return { success: true, message: "บันทึกอีเมลผู้รับแจ้งเตือนเรียบร้อยแล้ว" };
+}
+
+/**
+ * ดึงรายการอีเมลแอดมินทั้งหมด
+ */
+function getAdminEmails(customEmails) {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const rawEmails = customEmails || scriptProps.getProperty("ADMIN_EMAILS") || scriptProps.getProperty("SELLER_EMAILS") || "";
+  
+  const emailList = String(rawEmails)
+    .split(/[,;\n]+/)
+    .map(e => e.trim())
+    .filter(e => e.includes("@") && e.includes("."));
+
+  if (emailList.length === 0) {
+    // หากไม่ได้ตั้งค่าไว้ ให้ใช้อีเมลของเจ้าของ Google Account ที่รันสคริปต์
+    try {
+      const ownerEmail = Session.getEffectiveUser().getEmail();
+      if (ownerEmail && ownerEmail.includes("@")) {
+        emailList.push(ownerEmail);
+      }
+    } catch (e) {}
+  }
+
+  return emailList;
+}
+
+/**
+ * ส่งอีเมลไปยังรายชื่อผู้รับทั้งหมด
+ */
+function sendEmailToRecipients(emailList, subject, plainText, htmlBody) {
+  if (!emailList || emailList.length === 0) {
+    Logger.log("No email recipients found");
+    return { success: false, message: "ไม่พบที่อยู่อีเมลผู้รับ" };
+  }
+
+  const toAddress = emailList.join(", ");
+  try {
+    MailApp.sendEmail({
+      to: toAddress,
+      subject: subject,
+      body: plainText,
+      htmlBody: htmlBody
+    });
+    Logger.log("Email sent successfully to: " + toAddress);
+    return { success: true, message: "ส่งอีเมลเรียบร้อยแล้ว" };
+  } catch (err) {
+    Logger.log("Error sending email: " + err);
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * ทดสอบส่งอีเมลแจ้งเตือน
+ */
+function testEmailNotification(customEmails) {
+  const emailList = getAdminEmails(customEmails);
+  if (emailList.length === 0) {
+    return {
+      success: false,
+      message: "ไม่พบที่อยู่อีเมลสำหรับทดสอบ กรุณากรอกอีเมลของคุณครูในช่องตั้งค่าก่อนกดทดสอบครับ"
+    };
+  }
+
+  const subject = "✅ [ทดสอบระบบ] การแจ้งเตือนร้านค้าหมวดการงานอาชีพสำเร็จเรียบร้อย!";
+  const toAddress = emailList.join(", ");
+
+  const htmlBody = `
+    <div style="font-family: 'Sarabun', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+      <div style="font-size: 44px; margin-bottom: 12px;">🎉</div>
+      <h2 style="color: #0284c7; margin: 0 0 10px 0; font-size: 20px;">ทดสอบระบบแจ้งเตือนทางอีเมลสำเร็จ!</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 18px 0;">
+        ระบบแจ้งเตือนทางอีเมลของ <strong>ร้านค้าหมวดการงานอาชีพ</strong> เชื่อมต่อและทำงานได้สมบูรณ์แล้วครับ
+      </p>
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; color: #166534; font-size: 14px; text-align: left; line-height: 1.6;">
+        📩 <strong>เมื่อมีรายการสั่งซื้อสินค้า (COD) หรือสั่งจองสินค้าล่วงหน้า</strong><br>
+        ระบบจะจัดส่งรายละเอียดผู้สั่ง รายการสินค้า ยอดเงิน และสถานที่นัดรับ เข้ามาที่อีเมลนี้ทันทีครับ
+      </div>
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 14px;">
+        ส่งไปยัง: ${toAddress} | ระบบร้านค้าหมวดการงานอาชีพ (CareerShop)
+      </p>
+    </div>
+  `;
+
+  const plainText = "✅ ทดสอบระบบแจ้งเตือนร้านค้าหมวดการงานอาชีพสำเร็จเรียบร้อย! ระบบอีเมลพร้อมใช้งานแล้วครับ ส่งไปยัง: " + toAddress;
+
+  try {
+    MailApp.sendEmail({
+      to: toAddress,
+      subject: subject,
+      body: plainText,
+      htmlBody: htmlBody
+    });
+    return {
+      success: true,
+      message: "ส่งอีเมลทดสอบสำเร็จแล้ว! กรุณาตรวจสอบในกล่องจดหมาย (" + toAddress + ")"
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: "ส่งอีเมลไม่สำเร็จ: " + err.toString()
+    };
+  }
+}
+
+/**
+ * ส่งอีเมลแจ้งเตือนเมื่อมีคำสั่งซื้อใหม่ (COD)
+ */
+function notifySellerNewOrder(data, orderId) {
+  const isTeacher = data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher";
+  const buyerName = data.student_name || data.name || "ไม่ระบุชื่อ";
+  const buyerRoleText = isTeacher
+    ? `คุณครู (${data.department || 'ไม่ระบุกลุ่มสาระ'})`
+    : `นักเรียน (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
+
+  let itemsHtml = "";
+  let itemsText = "";
+  let itemsArray = [];
+  if (Array.isArray(data.items)) {
+    itemsArray = data.items;
+  } else if (typeof data.items === "string") {
+    try {
+      itemsArray = JSON.parse(data.items);
+    } catch (e) {}
+  } else if (typeof data.items_json === "string") {
+    try {
+      itemsArray = JSON.parse(data.items_json);
+    } catch (e) {}
+  }
+
+  if (itemsArray.length > 0) {
+    itemsHtml = itemsArray.map(item => `
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">${item.name || item.product_name}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.quantity || 1}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${(item.price || 0) * (item.quantity || 1)} ฿</td>
+      </tr>
+    `).join("");
+    itemsText = itemsArray.map(item => `- ${item.name} x${item.quantity} (${(item.price || 0) * (item.quantity || 1)} บาท)`).join("\n");
+  } else {
+    itemsHtml = `<tr><td colspan="3" style="padding: 10px 12px; color: #64748b;">(ดูรายละเอียดในชีต)</td></tr>`;
+    itemsText = "ดูรายละเอียดในระบบ";
+  }
+
+  const subject = `🛒 [คำสั่งซื้อใหม่ COD] รหัส ${orderId} - ยอดรวม ${data.total_price || 0} บาท`;
+
+  const htmlBody = `
+    <div style="font-family: 'Sarabun', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+      <div style="background: linear-gradient(135deg, #0284c7, #0369a1); padding: 22px 24px; color: #ffffff;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🛒 มีคำสั่งซื้อใหม่ (เก็บเงินปลายทาง COD)</h2>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">ร้านค้าหมวดการงานอาชีพ (CareerShop)</p>
+      </div>
+      
+      <div style="padding: 24px;">
+        <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px 16px; border-radius: 6px; margin-bottom: 20px;">
+          <div style="color: #166534; font-weight: 700; font-size: 16px;">รหัสคำสั่งซื้อ: ${orderId}</div>
+          <div style="color: #15803d; font-size: 15px; margin-top: 4px;">ยอดรวมทั้งสิ้น: <strong>${data.total_price || 0} บาท</strong> (Cash on Delivery)</div>
+        </div>
+
+        <h3 style="font-size: 15px; color: #334155; margin: 0 0 12px 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">👤 ข้อมูลผู้สั่งซื้อ</h3>
+        <table style="width: 100%; font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.6;">
+          <tr>
+            <td style="width: 130px; font-weight: 600; color: #1e293b;">ชื่อผู้สั่ง:</td>
+            <td><strong>${buyerName}</strong></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">สถานะ:</td>
+            <td>${buyerRoleText}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">เบอร์โทรศัพท์:</td>
+            <td><a href="tel:${data.phone}" style="color: #0284c7; text-decoration: none; font-weight: 600;">${data.phone || '-'}</a></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">สถานที่นัดรับ:</td>
+            <td style="color: #0369a1; font-weight: 600;">${data.pickup_location || 'หมวดการงานอาชีพ'}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">หมายเหตุ:</td>
+            <td>${data.note || '-'}</td>
+          </tr>
+        </table>
+
+        <h3 style="font-size: 15px; color: #334155; margin: 0 0 12px 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">📦 รายการสินค้าที่สั่งซื้อ</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
+          <thead>
+            <tr style="background: #f8fafc; color: #475569;">
+              <th style="padding: 8px 12px; text-align: left; border-bottom: 1px solid #cbd5e1;">สินค้า</th>
+              <th style="padding: 8px 12px; text-align: center; border-bottom: 1px solid #cbd5e1; width: 60px;">จำนวน</th>
+              <th style="padding: 8px 12px; text-align: right; border-bottom: 1px solid #cbd5e1; width: 90px;">ราคา</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="2" style="padding: 12px; text-align: right; color: #1e293b; font-size: 15px;">ยอดรวมสุทธิ:</th>
+              <th style="padding: 12px; text-align: right; color: #0284c7; font-size: 17px;">${data.total_price || 0} ฿</th>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="text-align: center; margin-top: 10px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+          อีเมลนี้ส่งอัตโนมัติจากระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ
+        </div>
+      </div>
+    </div>
+  `;
+
+  const plainText = `
+🛒 มีคำสั่งซื้อใหม่ (ชำระเงินปลายทาง COD)!
+รหัสคำสั่งซื้อ: ${orderId}
+ผู้สั่งซื้อ: ${buyerName} (${buyerRoleText})
+เบอร์โทร: ${data.phone || '-'}
+สถานที่นัดรับ: ${data.pickup_location || 'หมวดการงานอาชีพ'}
+ยอดรวมทั้งสิ้น: ${data.total_price || 0} บาท
+หมายเหตุ: ${data.note || '-'}
+
+รายการสินค้า:
+${itemsText}
+  `.trim();
+
+  // 1. ส่งอีเมลแจ้งเตือน
+  const emailList = getAdminEmails(data.admin_emails);
+  sendEmailToRecipients(emailList, subject, plainText, htmlBody);
+
+  // 2. ส่งผ่าน LINE (หากมีการตั้งค่าไว้)
+  const lineMsg = `🛒 มีคำสั่งซื้อใหม่ (COD หมวดการงานอาชีพ)!\nรหัส: ${orderId}\nผู้สั่ง: ${buyerName} (${buyerRoleText})\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || 'ห้องพักครู'}\nยอดรวม: ${data.total_price} บาท`;
+  sendLineMessagingApi(lineMsg, data.line_token, data.line_user_ids);
+}
+
+/**
+ * ส่งอีเมลแจ้งเตือนเมื่อมีรายการสั่งจองใหม่ (Pre-order)
+ */
+function notifySellerNewPreorder(data, preId) {
+  const isTeacher = data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher";
+  const buyerName = data.student_name || "ไม่ระบุชื่อ";
+  const buyerRoleText = isTeacher
+    ? `คุณครู (${data.department || 'ไม่ระบุกลุ่มสาระ'})`
+    : `นักเรียน (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
+
+  const subject = `🔔 [รายการสั่งจองใหม่] รหัส ${preId} - ${data.product_name} (${data.quantity} ชิ้น)`;
+
+  const htmlBody = `
+    <div style="font-family: 'Sarabun', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+      <div style="background: linear-gradient(135deg, #d97706, #b45309); padding: 22px 24px; color: #ffffff;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🔔 มีรายการสั่งจองสินค้าใหม่ (Pre-order)</h2>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">ร้านค้าหมวดการงานอาชีพ (รอจัดเตรียม 2-3 วัน)</p>
+      </div>
+      
+      <div style="padding: 24px;">
+        <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 6px; margin-bottom: 20px;">
+          <div style="color: #92400e; font-weight: 700; font-size: 16px;">รหัสการจอง: ${preId}</div>
+          <div style="color: #b45309; font-size: 15px; margin-top: 4px;">
+            สินค้าที่สั่งจอง: <strong>${data.product_name}</strong> (จำนวน <strong>${data.quantity}</strong> ชิ้น)
+          </div>
+        </div>
+
+        <h3 style="font-size: 15px; color: #334155; margin: 0 0 12px 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;">👤 ข้อมูลผู้สั่งจอง</h3>
+        <table style="width: 100%; font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.6;">
+          <tr>
+            <td style="width: 130px; font-weight: 600; color: #1e293b;">ชื่อผู้สั่งจอง:</td>
+            <td><strong>${buyerName}</strong></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">สถานะ:</td>
+            <td>${buyerRoleText}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">เบอร์โทรศัพท์:</td>
+            <td><a href="tel:${data.phone}" style="color: #0284c7; text-decoration: none; font-weight: 600;">${data.phone || '-'}</a></td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">จุดนัดรับของ:</td>
+            <td style="color: #0369a1; font-weight: 600;">${data.pickup_location || 'หมวดการงานอาชีพ'}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">ช่องทางรับแจ้งเตือน:</td>
+            <td><span style="background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-weight: 600;">${data.notify_channel || 'SMS'}</span> ${data.notify_account || '-'}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 600; color: #1e293b;">หมายเหตุ:</td>
+            <td>${data.note || '-'}</td>
+          </tr>
+        </table>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-top: 16px; font-size: 13px; color: #64748b;">
+          💡 <strong>การดำเนินการ:</strong> เมื่อสินค้าพร้อมส่งมอบ สามารถกำหนดวันรับของและกดส่งข้อความแจ้งเตือนหาผู้ซื้อได้ที่แดชบอร์ดแอดมินแท็บ <em>"สั่งจองสินค้า"</em> ครับ
+        </div>
+
+        <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+          อีเมลนี้ส่งอัตโนมัติจากระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ
+        </div>
+      </div>
+    </div>
+  `;
+
+  const plainText = `
+🔔 มีรายการสั่งจองสินค้าใหม่ (Pre-order)!
+รหัสการจอง: ${preId}
+สินค้า: ${data.product_name} (${data.quantity} ชิ้น)
+ผู้สั่งจอง: ${buyerName} (${buyerRoleText})
+เบอร์โทร: ${data.phone || '-'}
+จุดนัดรับ: ${data.pickup_location || 'หมวดการงานอาชีพ'}
+ช่องทางแจ้งเตือน: ${data.notify_channel || 'SMS'} (${data.notify_account || '-'})
+หมายเหตุ: ${data.note || '-'}
+  `.trim();
+
+  // 1. ส่งอีเมลแจ้งเตือน
+  const emailList = getAdminEmails(data.admin_emails);
+  sendEmailToRecipients(emailList, subject, plainText, htmlBody);
+
+  // 2. ส่งผ่าน LINE (หากมีการตั้งค่าไว้)
+  const lineMsg = `🔔 มีรายการสั่งจองสินค้าใหม่ (หมวดการงานอาชีพ)!\nรหัส: ${preId}\nสินค้า: ${data.product_name} (${data.quantity} ชิ้น)\nผู้จอง: ${buyerName} (${buyerRoleText})\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || '-'}`;
+  sendLineMessagingApi(lineMsg, data.line_token, data.line_user_ids);
+}
+
+/**
  * บันทึกการตั้งค่า LINE Messaging API ลง Script Properties ใน Google Apps Script
  */
 function saveLineSettingsToProperties(token, userIds) {
@@ -509,48 +848,30 @@ function saveLineSettingsToProperties(token, userIds) {
 
 /**
  * ฟังก์ชันหลักในการส่งข้อความผ่าน LINE Messaging API
- * รองรับทั้ง Push (1 คน), Multicast (หลายคน), และ Broadcast (ทุกคนที่เป็นเพื่อนกับบอท)
  */
 function sendLineMessagingApi(messageText, customToken, customUserIds) {
   const scriptProps = PropertiesService.getScriptProperties();
   const token = customToken || scriptProps.getProperty("LINE_CHANNEL_ACCESS_TOKEN") || scriptProps.getProperty("LINE_ACCESS_TOKEN") || "";
   const rawUsers = customUserIds || scriptProps.getProperty("LINE_USER_IDS") || scriptProps.getProperty("LINE_ADMIN_USER_IDS") || scriptProps.getProperty("LINE_DESTINATION_IDS") || "";
 
-  if (!token) {
-    return { success: false, message: "ไม่พบ LINE Channel Access Token" };
-  }
+  if (!token) return { success: false, message: "ไม่พบ LINE Channel Access Token" };
 
   const userIds = String(rawUsers).split(/[,;\n]+/).map(u => u.trim()).filter(u => u.length > 0);
-
-  const payloadMessage = {
-    type: "text",
-    text: messageText
-  };
+  const payloadMessage = { type: "text", text: messageText };
 
   try {
     let url = "";
     let payload = {};
 
     if (userIds.length === 1) {
-      // 1 คน: Push Message
       url = "https://api.line.me/v2/bot/message/push";
-      payload = {
-        to: userIds[0],
-        messages: [payloadMessage]
-      };
+      payload = { to: userIds[0], messages: [payloadMessage] };
     } else if (userIds.length > 1) {
-      // หลายคน: Multicast Message
       url = "https://api.line.me/v2/bot/message/multicast";
-      payload = {
-        to: userIds,
-        messages: [payloadMessage]
-      };
+      payload = { to: userIds, messages: [payloadMessage] };
     } else {
-      // ไม่ได้ระบุ User ID: Broadcast Message
       url = "https://api.line.me/v2/bot/message/broadcast";
-      payload = {
-        messages: [payloadMessage]
-      };
+      payload = { messages: [payloadMessage] };
     }
 
     const res = UrlFetchApp.fetch(url, {
@@ -563,72 +884,10 @@ function sendLineMessagingApi(messageText, customToken, customUserIds) {
       muteHttpExceptions: true
     });
 
-    const statusCode = res.getResponseCode();
-    const responseText = res.getContentText();
-
-    if (statusCode === 200) {
-      return { success: true, message: "ส่งข้อความผ่าน LINE Messaging API สำเร็จ" };
-    } else {
-      Logger.log("LINE Messaging API Error (" + statusCode + "): " + responseText);
-      return { success: false, statusCode: statusCode, message: responseText };
-    }
+    return { success: res.getResponseCode() === 200 };
   } catch (err) {
-    Logger.log("sendLineMessagingApi Exception: " + err);
     return { success: false, error: err.toString() };
   }
-}
-
-/**
- * ทดสอบส่งแจ้งเตือนผ่าน LINE Messaging API
- */
-function testLineMessagingApi(customToken, customUserIds) {
-  const testMsg = "✅ ทดสอบการเชื่อมต่อระบบแจ้งเตือนร้านค้าหมวดการงานอาชีพผ่าน LINE Messaging API สำเร็จเรียบร้อย!";
-  const result = sendLineMessagingApi(testMsg, customToken, customUserIds);
-  if (result.success) {
-    return { success: true, message: "ส่งข้อความทดสอบเข้า LINE ผ่าน Messaging API สำเร็จเรียบร้อยแล้ว!" };
-  } else {
-    return {
-      success: false,
-      message: "ส่งข้อความไม่สำเร็จ: " + (result.message || result.error || "กรุณาตรวจสอบ Channel Access Token และ User ID")
-    };
-  }
-}
-
-/**
- * แจ้งเตือนผู้ขายเมื่อมีรายการสั่งจองใหม่ (Pre-order)
- */
-function notifySellerNewPreorder(data, preId) {
-  const buyerInfo = (data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher")
-    ? `คุณครู ${data.student_name} (${data.department || data.student_class || 'หมวดการงานฯ'})`
-    : `${data.student_name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
-
-  const msg = `🔔 มีรายการสั่งจองสินค้าใหม่ (หมวดการงานอาชีพ)!\nรหัส: ${preId}\nสินค้า: ${data.product_name} (${data.quantity} ชิ้น)\nผู้จอง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || '-'}\nช่องทางแจ้งเตือน: ${data.notify_channel} (${data.notify_account})\nหมายเหตุ: ${data.note || '-'}`;
-
-  // 1. ลองส่งผ่าน LINE Messaging API
-  const apiResult = sendLineMessagingApi(msg, data.line_token, data.line_user_ids);
-  if (apiResult && apiResult.success) return;
-
-  // 2. หากยังไม่ได้ตั้ง LINE Messaging API ให้ fallback ไป LINE Notify เดิม
-  notifyViaLineNotify(msg, data.seller_token);
-}
-
-/**
- * แจ้งเตือนผู้ขายเมื่อมีคำสั่งซื้อใหม่ (COD Order)
- */
-function notifySellerNewOrder(data, orderId) {
-  const isTeacher = data.buyer_type === "ครู" || data.buyer_type === "คุณครู" || data.buyer_type === "teacher";
-  const buyerInfo = isTeacher
-    ? `คุณครู ${data.student_name || data.name} (${data.department || 'ไม่ระบุกลุ่มสาระ'})`
-    : `${data.student_name || data.name} (${data.student_class && data.student_class !== 'นักเรียน' ? `ชั้น ${data.student_class}/` : ''}ห้อง ${data.student_room || '-'} เลขที่ ${data.student_no || '-'})`;
-
-  const msg = `🛒 มีคำสั่งซื้อใหม่ (COD หมวดการงานอาชีพ)!\nรหัส: ${orderId}\nผู้สั่ง: ${buyerInfo}\nเบอร์โทร: ${data.phone}\nจุดนัดรับ: ${data.pickup_location || 'ห้องพักครู'}\nยอดรวม: ${data.total_price} บาท\nหมายเหตุ: ${data.note || '-'}`;
-
-  // 1. ลองส่งผ่าน LINE Messaging API
-  const apiResult = sendLineMessagingApi(msg, data.line_token, data.line_user_ids);
-  if (apiResult && apiResult.success) return;
-
-  // 2. Fallback ไปยัง LINE Notify เดิม
-  notifyViaLineNotify(msg, data.seller_token);
 }
 
 /**

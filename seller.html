@@ -269,46 +269,33 @@
 
         <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
 
-        <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-main);">
-          <i class="fa-brands fa-line" style="color: #06c755;"></i> ตั้งค่า LINE Messaging API แจ้งเตือนแอดมิน (LINE Official Account / Bot)
+        <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem; color: var(--text-main);">
+          <i class="fa-solid fa-envelope" style="color: #0284c7;"></i> ตั้งค่าอีเมลแจ้งเตือนคุณครู/แอดมิน (Email Notification)
         </h3>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-          ระบบส่งข้อความแจ้งเตือนคำสั่งซื้อและการสั่งจองผ่าน <strong>LINE Messaging API</strong> (ระบบมาตรฐานใหม่ ทดแทน LINE Notify ที่กำลังยุติบริการ)
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
+          เมื่อมีคำสั่งซื้อใหม่ (COD) หรือมีผู้สั่งจองสินค้า (Pre-order) ระบบจะส่งอีเมลแจ้งเตือนรายละเอียดสินค้า ผู้สั่งซื้อ และสถานที่นัดรับ ไปยังอีเมลของคุณครูทันที (ไม่ต้องสมัคร Token ใช้งานได้ฟรีและเสถียร 100%)
         </p>
 
         <div class="form-group">
-          <label class="form-label"><i class="fa-solid fa-key"></i> LINE Channel Access Token (Long-lived) *:</label>
-          <textarea id="lineChannelAccessTokenInput" class="form-textarea" rows="2" placeholder="วาง Channel Access Token จาก LINE Developers (เช่น eK...ยาวประมาณ 170+ ตัวอักษร)"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label"><i class="fa-solid fa-users"></i> LINE User ID หรือ Group ID ผู้รับแจ้งเตือน (ใส่หลายคนได้):</label>
-          <textarea id="lineUserIdsInput" class="form-textarea" rows="2" placeholder="เช่น&#10;Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (User ID ของครู A)&#10;Uyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy (User ID ของครู B)&#10;หรือ Group ID Cxxxxxxxx... (หากดึงบอทเข้ากลุ่มไลน์คุณครู)"></textarea>
-          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-            * ใส่ User ID (ขึ้นต้นด้วย <code>U</code>) หรือ Group ID (ขึ้นต้นด้วย <code>C</code>) โดยคั่นด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่ (หากเว้นว่างไว้ ระบบจะส่งแบบ Broadcast ไปยังผู้ติดตามบอททุกคน)
+          <label class="form-label"><i class="fa-solid fa-at"></i> อีเมลของคุณครู/ผู้รับแจ้งเตือน (ใส่อีเมลหลายคนได้) *:</label>
+          <textarea id="adminEmailsInput" class="form-textarea" rows="3" placeholder="เช่น&#10;teacher1@gmail.com, teacher2@school.ac.th&#10;career_shop@school.ac.th"></textarea>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
+            * คั่นแต่ละอีเมลด้วยเครื่องหมายจุลภาค <code>,</code> หรือขึ้นบรรทัดใหม่ (หากเว้นว่างไว้ ระบบจะส่งเข้าอีเมล Google Account ที่เป็นเจ้าของสคริปต์อัตโนมัติ)
           </div>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
-          <button class="btn btn-primary" onclick="saveLineMessagingSettings()">
-            <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า LINE API
+        <div style="display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="saveEmailSettings()">
+            <i class="fa-solid fa-floppy-disk"></i> บันทึกอีเมลแจ้งเตือน
           </button>
-          <button class="btn btn-secondary" onclick="testLineMessagingApi()">
-            <i class="fa-brands fa-line" style="color: #06c755;"></i> ทดสอบส่งแจ้งเตือน LINE Messaging API
+          <button class="btn btn-secondary" onclick="testEmailNotification()">
+            <i class="fa-solid fa-paper-plane" style="color: #0284c7;"></i> ทดสอบส่งอีเมลแจ้งเตือน
           </button>
         </div>
 
-        <details style="margin-top: 1.25rem; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted);">
-          <summary style="font-weight: 600; cursor: pointer; color: var(--text-main);">
-            <i class="fa-solid fa-circle-question"></i> วิธีขอ Channel Access Token และ User ID ใน 3 นาที
-          </summary>
-          <ol style="margin-top: 0.5rem; padding-left: 1.25rem; line-height: 1.6;">
-            <li>เข้าเว็บ <a href="https://developers.line.biz/" target="_blank" style="color: var(--primary);">LINE Developers Console</a> แล้วล็อกอินด้วยบัญชี LINE</li>
-            <li>สร้าง <strong>Provider</strong> (เช่น หมวดการงานอาชีพ) และสร้าง <strong>Channel: Messaging API</strong></li>
-            <li>ไปที่แท็บ <strong>Messaging API</strong> เลื่อนลงล่างสุดตรง <em>Channel access token (long-lived)</em> กดปุ่ม <strong>Issue</strong> เพื่อคัดลอก Token</li>
-            <li>ดูรหัส <strong>Your user ID</strong> (รหัส U...) ในหน้า Console เดียวกัน แล้วนำมากรอกด้านบน พร้อมทั้งสแกน QR Code เพื่อเพิ่มบอทเป็นเพื่อนใน LINE</li>
-          </ol>
-        </details>
+        <div style="margin-top: 1rem; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: var(--radius-sm); padding: 0.85rem 1rem; font-size: 0.85rem; color: #0369a1; line-height: 1.6;">
+          <i class="fa-solid fa-circle-check"></i> <strong>ข้อดีของระบบแจ้งเตือนทางอีเมล:</strong> ได้รับข้อมูลออเดอร์ครบถ้วน ทั้งตารางสินค้า ยอดเงิน ชื่อผู้สั่ง เบอร์โทร และจุดนัดรับ สามารถกดโทรหาผู้ซื้อได้โดยตรงจากอีเมล
+        </div>
 
         <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
 
@@ -517,6 +504,6 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="seller.js?v=2.0"></script>
+  <script src="seller.js?v=2.1"></script>
 </body>
 </html>

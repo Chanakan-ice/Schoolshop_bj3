@@ -26,13 +26,9 @@ document.addEventListener("DOMContentLoaded", () => {
     tokenInput.value = savedToken;
   }
 
-  const lineTokenInput = document.getElementById("lineChannelAccessTokenInput");
-  const lineUsersInput = document.getElementById("lineUserIdsInput");
-  if (lineTokenInput) {
-    lineTokenInput.value = localStorage.getItem("LINE_CHANNEL_ACCESS_TOKEN") || "";
-  }
-  if (lineUsersInput) {
-    lineUsersInput.value = localStorage.getItem("LINE_USER_IDS") || "";
+  const emailInput = document.getElementById("adminEmailsInput");
+  if (emailInput) {
+    emailInput.value = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "";
   }
 
   // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
@@ -816,6 +812,69 @@ function changeAdminPassword() {
   document.getElementById("newAdminPasswordInput").value = "";
   document.getElementById("confirmAdminPasswordInput").value = "";
   showToast("เปลี่ยนรหัสผ่านแอดมินสำเร็จแล้ว", "success");
+}
+
+function saveEmailSettings() {
+  const input = document.getElementById("adminEmailsInput");
+  const emails = input ? input.value.trim() : "";
+
+  localStorage.setItem("SCHOOLSHOP_ADMIN_EMAILS", emails);
+
+  if (GAS_API_URL && emails) {
+    fetch(GAS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "saveEmailSettings",
+        emails: emails
+      })
+    }).then(res => res.json()).then(json => {
+      if (json.success) {
+        showToast("บันทึกอีเมลผู้รับแจ้งเตือนไปยังเซิร์ฟเวอร์เรียบร้อยแล้ว", "success");
+      }
+    }).catch(e => console.warn("Sync email settings err:", e));
+  }
+
+  showToast("บันทึกการตั้งค่าอีเมลแจ้งเตือนเรียบร้อยแล้ว", "success");
+}
+
+async function testEmailNotification() {
+  const input = document.getElementById("adminEmailsInput");
+  const emails = input ? input.value.trim() : (localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || "");
+
+  if (!emails) {
+    showToast("กรุณาระบุที่อยู่อีเมลของคุณครูก่อนกดทดสอบครับ", "error");
+    return;
+  }
+
+  showToast("กำลังส่งอีเมลทดสอบ...", "info");
+
+  if (GAS_API_URL) {
+    try {
+      const res = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "testEmail",
+          emails: emails
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ ${json.message}`, "success");
+        return;
+      } else {
+        showToast(`⚠️ ${json.message || 'ส่งอีเมลทดสอบล้มเหลว'}`, "error");
+        return;
+      }
+    } catch (e) {
+      console.warn("Test email error:", e);
+      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์", "error");
+      return;
+    }
+  }
+
+  showToast("บันทึกอีเมลเรียบร้อยแล้ว (จะส่งผ่าน GAS เมื่อเชื่อมต่อ Web App URL)", "info");
 }
 
 function saveLineMessagingSettings() {
