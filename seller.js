@@ -5,12 +5,12 @@
  * ==============================================================================
  */
 
-var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw/exec";
+var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbxMhd31R5kY5n1MXObzkc0UFqE0uaxgb07zOxwRufEbppj0ThoWKWJACFP8tMWEabH7/exec";
 var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
   let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
-  if (!url || !url.startsWith("https://script.google.com/macros/s/")) {
+  if (!url || !url.startsWith("https://script.google.com/macros/s/") || url.includes("AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw")) {
     url = DEFAULT_GAS_URL;
     localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_GAS_URL);
   }
