@@ -84,12 +84,18 @@ let products = [];
 let cart = JSON.parse(localStorage.getItem("SCHOOLSHOP_CART")) || [];
 let selectedCategory = "all";
 let searchQuery = "";
+let pendingCheckoutItems = null;
+let isBuyNowFlow = false;
+let activeCheckoutItems = null;
+let regSelectedRole = "student";
 
 // ==================== Initialization ====================
 document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
   loadProducts();
   updateCartBadge();
+  initCustomerAuth();
+  handleUrlHash();
 });
 
 function initEventListeners() {
@@ -112,6 +118,19 @@ function initEventListeners() {
       renderProducts();
     });
   }
+
+  // Close customer dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    const wrap = document.getElementById("customerNavWrap");
+    const menu = document.getElementById("accountDropdownMenu");
+    if (wrap && menu && !wrap.contains(e.target)) {
+      menu.classList.remove("show");
+    }
+  });
+
+  // Listen for browser back/forward navigation between product detail and shop listing
+  window.addEventListener("hashchange", handleUrlHash);
+  window.addEventListener("popstate", handleUrlHash);
 }
 
 // ==================== Fetch Products ====================
@@ -189,7 +208,7 @@ function renderProducts() {
     const isLowStock = stock > 0 && stock <= 5;
 
     return `
-      <div class="product-card">
+      <div class="product-card" onclick="viewProductDetail('${item.id}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียดและสั่งซื้อ">
         <div class="product-image-wrap">
           <img src="${item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="${item.name}" class="product-img" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
           <span class="product-badge">${item.category || 'ทั่วไป'}</span>
@@ -207,11 +226,11 @@ function renderProducts() {
             </div>
             
             ${isOutOfStock ? `
-              <button class="add-cart-btn preorder-card-btn" onclick="openPreorderForProduct('${encodeURIComponent(item.name)}')">
+              <button class="add-cart-btn preorder-card-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
                 <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
               </button>
             ` : `
-              <button class="add-cart-btn" onclick="addToCart('${item.id}')">
+              <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${item.id}')">
                 <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
               </button>
             `}
@@ -220,6 +239,621 @@ function renderProducts() {
       </div>
     `;
   }).join("");
+}
+
+// ==================== Product Detail View (หน้ารายละเอียดสินค้า & สั่งซื้อทันที) ====================
+function viewProductDetail(productId, pushHistory = true) {
+  const prod = products.find(p => String(p.id) === String(productId));
+  if (!prod) return;
+
+  const mainShop = document.getElementById("mainShopView");
+  const detailView = document.getElementById("productDetailView");
+  const detailContainer = document.getElementById("productDetailContainer");
+  if (!detailView || !detailContainer) return;
+
+  if (mainShop) mainShop.style.display = "none";
+  detailView.style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (pushHistory) {
+    window.location.hash = "product-" + productId;
+  }
+
+  const stock = Number(prod.stock) || 0;
+  const isOutOfStock = stock <= 0;
+  const isLowStock = stock > 0 && stock <= 5;
+  const stockClass = isOutOfStock ? "out" : (isLowStock ? "low" : "in");
+  const stockText = isOutOfStock
+    ? '<i class="fa-solid fa-clock"></i> สินค้าหมดชั่วคราว (เปิดรับจองล่วงหน้า)'
+    : (isLowStock ? `<i class="fa-solid fa-triangle-exclamation"></i> ใกล้หมด เหลือเพียง ${stock} ชิ้น` : `<i class="fa-solid fa-boxes-stacked"></i> สต็อกพร้อมส่ง: ${stock} ชิ้น`);
+
+  detailContainer.innerHTML = `
+    <button class="btn btn-secondary detail-back-btn" onclick="closeProductDetail()">
+      <i class="fa-solid fa-arrow-left"></i> กลับหน้ารายการสินค้า
+    </button>
+
+    <div class="product-detail-grid">
+      <!-- Media Side -->
+      <div class="product-detail-media">
+        <img src="${prod.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" 
+             alt="${prod.name}" 
+             class="detail-main-img" 
+             onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
+      </div>
+
+      <!-- Info Side -->
+      <div class="product-detail-info">
+        <div class="detail-badge-row">
+          <span class="product-badge" style="position: static; font-size: 0.85rem; padding: 0.35rem 0.85rem;">
+            <i class="fa-solid fa-tag"></i> ${prod.category || 'ทั่วไป'}
+          </span>
+          <span class="detail-stock-badge ${stockClass}">
+            ${stockText}
+          </span>
+        </div>
+
+        <h1 class="detail-title">${prod.name}</h1>
+
+        <div class="detail-price-box">
+          <div class="detail-price-num">${Number(prod.price).toLocaleString()} <span class="detail-currency">฿</span></div>
+          <div class="detail-cod-note"><i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (Cash on Delivery) เมื่อรับสินค้า</div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title"><i class="fa-solid fa-circle-info"></i> รายละเอียดสินค้า & ผลงาน</div>
+          <div class="detail-desc">${prod.description ? prod.description.replace(/\n/g, '<br>') : 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-title"><i class="fa-solid fa-location-dot"></i> การรับสินค้า & ชำระเงิน</div>
+          <div class="detail-pickup-info">
+            <i class="fa-solid fa-school" style="color: var(--primary);"></i> 
+            นัดรับสินค้าได้ที่ <strong>ห้องพักครูหมวดการงานอาชีพ</strong> หรือระบุห้องเรียน/อาคารที่สะดวก พร้อมชำระเงินสดตอนรับสินค้า
+          </div>
+        </div>
+
+        ${stock > 0 ? `
+          <!-- Quantity Selector -->
+          <div class="detail-qty-row">
+            <label class="detail-qty-label">จำนวนที่ต้องการสั่งซื้อ:</label>
+            <div class="qty-counter">
+              <button type="button" class="qty-counter-btn" onclick="changeDetailQty(-1, ${stock})">-</button>
+              <input type="number" id="detailQtyInput" class="qty-counter-input" value="1" min="1" max="${stock}" readonly>
+              <button type="button" class="qty-counter-btn" onclick="changeDetailQty(1, ${stock})">+</button>
+            </div>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">(มีจำหน่าย ${stock} ชิ้น)</span>
+          </div>
+
+          <!-- Action Buttons: Buy Now & Add to Cart -->
+          <div class="detail-actions-row">
+            <button type="button" class="btn-buy-now" onclick="buyNowCurrentProduct('${prod.id}')">
+              <i class="fa-solid fa-bolt"></i> สั่งซื้อทันที (COD)
+            </button>
+            <button type="button" class="btn-add-cart-detail" onclick="addCurrentProductToCart('${prod.id}')">
+              <i class="fa-solid fa-cart-plus"></i> เพิ่มลงตะกร้า
+            </button>
+          </div>
+        ` : `
+          <div class="detail-actions-row">
+            <button type="button" class="btn-buy-now" style="background: linear-gradient(135deg, #d97706, #b45309);" onclick="openPreorderForProduct('${encodeURIComponent(prod.name)}')">
+              <i class="fa-solid fa-calendar-plus"></i> สินค้าหมดชั่วคราว - กดสั่งจองล่วงหน้า
+            </button>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function closeProductDetail(cleanHash = true) {
+  const mainShop = document.getElementById("mainShopView");
+  const detailView = document.getElementById("productDetailView");
+  if (detailView) detailView.style.display = "none";
+  if (mainShop) mainShop.style.display = "block";
+
+  if (cleanHash && window.location.hash.startsWith("#product-")) {
+    history.pushState(null, "", window.location.pathname + window.location.search);
+  }
+}
+
+function changeDetailQty(delta, maxStock) {
+  const input = document.getElementById("detailQtyInput");
+  if (!input) return;
+  let val = parseInt(input.value) || 1;
+  val += delta;
+  if (val < 1) val = 1;
+  if (val > maxStock) val = maxStock;
+  input.value = val;
+}
+
+function addCurrentProductToCart(productId) {
+  const prod = products.find(p => String(p.id) === String(productId));
+  if (!prod) return;
+
+  const qtyInput = document.getElementById("detailQtyInput");
+  const qty = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+  const currentStock = Number(prod.stock) || 0;
+
+  const existingIndex = cart.findIndex(c => String(c.id) === String(productId));
+  if (existingIndex > -1) {
+    if (cart[existingIndex].quantity + qty > currentStock) {
+      showToast(`สินค้า ${prod.name} ในสต็อกมีเพียง ${currentStock} ชิ้น`, "error");
+      return;
+    }
+    cart[existingIndex].quantity += qty;
+  } else {
+    if (currentStock < qty) {
+      showToast("สินค้าในสต็อกไม่เพียงพอ", "error");
+      return;
+    }
+    cart.push({
+      id: prod.id,
+      name: prod.name,
+      price: Number(prod.price),
+      quantity: qty,
+      image_url: prod.image_url
+    });
+  }
+
+  saveCart();
+  updateCartBadge();
+  showToast(`เพิ่ม "${prod.name}" (${qty} ชิ้น) ลงในตะกร้าแล้ว`, "success");
+}
+
+function buyNowCurrentProduct(productId) {
+  const prod = products.find(p => String(p.id) === String(productId));
+  if (!prod) return;
+
+  const qtyInput = document.getElementById("detailQtyInput");
+  const qty = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+
+  if ((Number(prod.stock) || 0) < qty) {
+    showToast("สินค้าในสต็อกไม่เพียงพอ", "error");
+    return;
+  }
+
+  const buyNowItem = [{
+    id: prod.id,
+    name: prod.name,
+    price: Number(prod.price),
+    quantity: qty,
+    image_url: prod.image_url
+  }];
+
+  const current = getCurrentCustomer();
+  if (!current) {
+    pendingCheckoutItems = buyNowItem;
+    isBuyNowFlow = true;
+    showToast("กรุณาเข้าสู่ระบบหรือสมัครสมาชิกเพื่อทำการสั่งซื้อครับ", "info");
+    openCustomerAuthModal('login');
+    return;
+  }
+
+  isBuyNowFlow = true;
+  openCheckoutModal(buyNowItem);
+}
+
+function handleUrlHash() {
+  const hash = window.location.hash || "";
+  if (hash.startsWith("#product-")) {
+    const pId = hash.replace("#product-", "");
+    viewProductDetail(pId, false);
+  } else {
+    closeProductDetail(false);
+  }
+}
+
+// ==================== Customer Account System (ระบบบัญชีลูกค้า & สลับบัญชี) ====================
+function getSavedAccounts() {
+  try {
+    return JSON.parse(localStorage.getItem("SCHOOLSHOP_CUSTOMER_ACCOUNTS") || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSavedAccounts(list) {
+  localStorage.setItem("SCHOOLSHOP_CUSTOMER_ACCOUNTS", JSON.stringify(list));
+  updateCustomerUI();
+}
+
+function getCurrentCustomer() {
+  try {
+    return JSON.parse(localStorage.getItem("SCHOOLSHOP_CURRENT_CUSTOMER") || "null");
+  } catch (e) {
+    return null;
+  }
+}
+
+function setCurrentCustomer(user) {
+  if (user) {
+    localStorage.setItem("SCHOOLSHOP_CURRENT_CUSTOMER", JSON.stringify(user));
+  } else {
+    localStorage.removeItem("SCHOOLSHOP_CURRENT_CUSTOMER");
+  }
+  updateCustomerUI();
+}
+
+function initCustomerAuth() {
+  updateCustomerUI();
+}
+
+function updateCustomerUI() {
+  const current = getCurrentCustomer();
+  const accounts = getSavedAccounts();
+
+  const nameEl = document.getElementById("customerNavName");
+  const avatarEl = document.getElementById("customerAvatarIcon");
+  const countEl = document.getElementById("dropdownAccountCount");
+  const savedCountEl = document.getElementById("savedAccountsCount");
+  const userHeader = document.getElementById("dropdownUserHeader");
+  const userName = document.getElementById("dropdownUserName");
+  const userEmail = document.getElementById("dropdownUserEmail");
+  const loginBtn = document.getElementById("dropdownLoginBtn");
+  const logoutBtn = document.getElementById("dropdownLogoutBtn");
+  const logoutDiv = document.getElementById("dropdownLogoutDivider");
+
+  if (countEl) countEl.innerText = accounts.length;
+  if (savedCountEl) savedCountEl.innerText = accounts.length;
+
+  if (current) {
+    if (nameEl) nameEl.innerText = current.name || current.email.split("@")[0];
+    if (avatarEl) {
+      avatarEl.innerHTML = current.buyer_type === "teacher" 
+        ? '<i class="fa-solid fa-chalkboard-user"></i>' 
+        : '<i class="fa-solid fa-graduation-cap"></i>';
+    }
+    if (userHeader) userHeader.style.display = "block";
+    if (userName) userName.innerText = current.name || "-";
+    if (userEmail) userEmail.innerText = current.email + (current.buyer_type === "teacher" ? " (คุณครู)" : ` (ห้อง ${current.student_room || '-'})`);
+    if (loginBtn) loginBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "flex";
+    if (logoutDiv) logoutDiv.style.display = "block";
+  } else {
+    if (nameEl) nameEl.innerText = "เข้าสู่ระบบ";
+    if (avatarEl) avatarEl.innerHTML = '<i class="fa-solid fa-user"></i>';
+    if (userHeader) userHeader.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "flex";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (logoutDiv) logoutDiv.style.display = "none";
+  }
+}
+
+function toggleCustomerDropdown() {
+  const menu = document.getElementById("accountDropdownMenu");
+  if (!menu) return;
+  menu.classList.toggle("show");
+  updateCustomerUI();
+}
+
+function openCustomerAuthModal(tab = "login") {
+  const menu = document.getElementById("accountDropdownMenu");
+  if (menu) menu.classList.remove("show");
+
+  const modal = document.getElementById("customerAuthModal");
+  if (!modal) return;
+
+  switchCustomerAuthTab(tab);
+  modal.classList.add("active");
+}
+
+function closeCustomerAuthModal() {
+  const modal = document.getElementById("customerAuthModal");
+  if (modal) modal.classList.remove("active");
+  const logErr = document.getElementById("loginAuthError");
+  const regErr = document.getElementById("regAuthError");
+  if (logErr) logErr.style.display = "none";
+  if (regErr) regErr.style.display = "none";
+}
+
+function switchCustomerAuthTab(tab) {
+  const tabLogin = document.getElementById("tabAuthLogin");
+  const tabReg = document.getElementById("tabAuthRegister");
+  const tabSwitch = document.getElementById("tabAuthSwitch");
+  const formLogin = document.getElementById("customerLoginForm");
+  const formReg = document.getElementById("customerRegisterForm");
+  const viewSwitch = document.getElementById("customerSwitchView");
+
+  if (!tabLogin || !tabReg || !tabSwitch) return;
+
+  tabLogin.classList.remove("active");
+  tabReg.classList.remove("active");
+  tabSwitch.classList.remove("active");
+
+  if (formLogin) formLogin.style.display = "none";
+  if (formReg) formReg.style.display = "none";
+  if (viewSwitch) viewSwitch.style.display = "none";
+
+  if (tab === "register") {
+    tabReg.classList.add("active");
+    if (formReg) formReg.style.display = "block";
+  } else if (tab === "switch") {
+    tabSwitch.classList.add("active");
+    if (viewSwitch) viewSwitch.style.display = "block";
+    renderSavedAccountsList();
+  } else {
+    tabLogin.classList.add("active");
+    if (formLogin) formLogin.style.display = "block";
+  }
+}
+
+function selectRegRole(role) {
+  regSelectedRole = role;
+  const btnStudent = document.getElementById("regRoleStudent");
+  const btnTeacher = document.getElementById("regRoleTeacher");
+  const studentFields = document.getElementById("regStudentFields");
+  const teacherFields = document.getElementById("regTeacherFields");
+
+  if (role === "teacher") {
+    if (btnTeacher) btnTeacher.classList.add("active");
+    if (btnStudent) btnStudent.classList.remove("active");
+    if (studentFields) studentFields.style.display = "none";
+    if (teacherFields) teacherFields.style.display = "block";
+  } else {
+    if (btnStudent) btnStudent.classList.add("active");
+    if (btnTeacher) btnTeacher.classList.remove("active");
+    if (studentFields) studentFields.style.display = "block";
+    if (teacherFields) teacherFields.style.display = "none";
+  }
+}
+
+function handleCustomerLoginSubmit(e) {
+  e.preventDefault();
+  const emailInput = document.getElementById("loginCustomerEmail");
+  const passInput = document.getElementById("loginCustomerPassword");
+  const errEl = document.getElementById("loginAuthError");
+
+  const email = (emailInput ? emailInput.value : "").trim().toLowerCase();
+  const password = passInput ? passInput.value : "";
+
+  if (!email || !password) {
+    if (errEl) {
+      errEl.innerText = "กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  const accounts = getSavedAccounts();
+  const found = accounts.find(a => a.email.toLowerCase() === email);
+
+  if (!found) {
+    if (errEl) {
+      errEl.innerHTML = `ยังไม่พบบัญชีอีเมลนี้ในอุปกรณ์ <a href="javascript:void(0)" onclick="switchCustomerAuthTab('register')" style="color: var(--primary); text-decoration: underline; font-weight: 600;">คลิกที่นี่เพื่อสมัครสมาชิกใหม่</a>`;
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  if (found.password && found.password !== password) {
+    if (errEl) {
+      errEl.innerText = "รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  // เข้าสู่ระบบสำเร็จ
+  if (errEl) errEl.style.display = "none";
+  setCurrentCustomer(found);
+  closeCustomerAuthModal();
+  showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับคุณ ${found.name}`, "success");
+
+  checkPendingOrderAction();
+}
+
+function handleCustomerRegisterSubmit(e) {
+  e.preventDefault();
+  const emailInput = document.getElementById("regCustomerEmail");
+  const passInput = document.getElementById("regCustomerPassword");
+  const nameInput = document.getElementById("regCustomerName");
+  const phoneInput = document.getElementById("regCustomerPhone");
+  const pickupInput = document.getElementById("regCustomerPickup");
+  const errEl = document.getElementById("regAuthError");
+
+  const email = (emailInput ? emailInput.value : "").trim().toLowerCase();
+  const password = passInput ? passInput.value : "";
+  const name = (nameInput ? nameInput.value : "").trim();
+  const phone = (phoneInput ? phoneInput.value : "").trim();
+  const pickup = (pickupInput ? pickupInput.value : "").trim();
+
+  if (!email || !password || !name || !phone) {
+    if (errEl) {
+      errEl.innerText = "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  if (password.length < 4) {
+    if (errEl) {
+      errEl.innerText = "รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร";
+      errEl.style.display = "block";
+    }
+    return;
+  }
+
+  const accounts = getSavedAccounts();
+  const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === email);
+
+  const newAccount = {
+    id: "CUST-" + Date.now().toString().slice(-6),
+    email: email,
+    password: password,
+    name: name,
+    buyer_type: regSelectedRole,
+    phone: phone,
+    pickup_location: pickup || (regSelectedRole === "teacher" ? "ห้องพักครูกลุ่มสาระการงานอาชีพ" : "หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)"),
+    student_room: regSelectedRole === "student" ? ((document.getElementById("regStudentRoom") && document.getElementById("regStudentRoom").value.trim()) || "") : "",
+    student_no: regSelectedRole === "student" ? ((document.getElementById("regStudentNo") && document.getElementById("regStudentNo").value.trim()) || "") : "",
+    department: regSelectedRole === "teacher" ? ((document.getElementById("regTeacherDept") && document.getElementById("regTeacherDept").value) || "กลุ่มสาระการเรียนรู้การงานอาชีพ") : "",
+    created_at: new Date().toISOString()
+  };
+
+  if (existingIdx > -1) {
+    // อัปเดตข้อมูลบัญชีเดิม
+    accounts[existingIdx] = newAccount;
+  } else {
+    // เพิ่มบัญชีใหม่ (รองรับ 1 คนหลายบัญชีในเครื่องเดียวกัน)
+    accounts.push(newAccount);
+  }
+
+  saveSavedAccounts(accounts);
+  setCurrentCustomer(newAccount);
+  closeCustomerAuthModal();
+  showToast(`สมัครสมาชิกสำเร็จ! ยินดีต้อนรับคุณ ${newAccount.name}`, "success");
+
+  checkPendingOrderAction();
+}
+
+function renderSavedAccountsList() {
+  const container = document.getElementById("savedAccountsList");
+  if (!container) return;
+  const accounts = getSavedAccounts();
+  const current = getCurrentCustomer();
+
+  if (accounts.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted); font-size: 0.9rem;">
+        <i class="fa-solid fa-users" style="font-size: 2.25rem; color: var(--text-light); margin-bottom: 0.75rem;"></i>
+        <div style="font-weight: 500;">ยังไม่มีบัญชีที่บันทึกไว้บนอุปกรณ์นี้</div>
+        <div style="font-size: 0.8rem; margin-top: 4px;">คุณสามารถสมัครบัญชีใหม่และสลับใช้งานได้ไม่จำกัด</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = accounts.map(acc => {
+    const isCurrent = current && (current.id === acc.id || current.email === acc.email);
+    const roleIcon = acc.buyer_type === "teacher" ? "fa-chalkboard-user" : "fa-graduation-cap";
+    const roleLabel = acc.buyer_type === "teacher" 
+      ? (acc.department || "คุณครู/บุคลากร") 
+      : `ห้อง ${acc.student_room || '-'} เลขที่ ${acc.student_no || '-'}`;
+
+    return `
+      <div class="account-card-item ${isCurrent ? 'active-account' : ''}" onclick="switchCustomerAccount('${acc.id}')">
+        <div class="account-card-avatar">
+          <i class="fa-solid ${roleIcon}"></i>
+        </div>
+        <div class="account-card-info">
+          <div class="account-card-name">
+            ${acc.name} ${isCurrent ? '<span class="account-current-tag"><i class="fa-solid fa-circle-check"></i> กำลังใช้งาน</span>' : ''}
+          </div>
+          <div class="account-card-email">${acc.email} • ${roleLabel}</div>
+        </div>
+        <div class="account-card-actions">
+          <button type="button" class="account-del-btn" onclick="removeSavedAccount('${acc.id}', event)" title="ลบบัญชีนี้ออกจากเครื่อง">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function switchCustomerAccount(accountId) {
+  const accounts = getSavedAccounts();
+  const target = accounts.find(a => a.id === accountId);
+  if (!target) return;
+
+  setCurrentCustomer(target);
+  closeCustomerAuthModal();
+  showToast(`สลับใช้งานเป็นบัญชี: ${target.name}`, "success");
+  checkPendingOrderAction();
+}
+
+function removeSavedAccount(accountId, event) {
+  if (event) event.stopPropagation();
+  if (!confirm("คุณต้องการลบบัญชีนี้ออกจากอุปกรณ์นี้ใช่หรือไม่?")) return;
+
+  let accounts = getSavedAccounts();
+  accounts = accounts.filter(a => a.id !== accountId);
+  saveSavedAccounts(accounts);
+
+  const current = getCurrentCustomer();
+  if (current && current.id === accountId) {
+    if (accounts.length > 0) {
+      setCurrentCustomer(accounts[0]);
+    } else {
+      setCurrentCustomer(null);
+    }
+  }
+
+  renderSavedAccountsList();
+  showToast("ลบบัญชีออกจากเครื่องแล้ว", "info");
+}
+
+function logoutCustomer() {
+  setCurrentCustomer(null);
+  const menu = document.getElementById("accountDropdownMenu");
+  if (menu) menu.classList.remove("show");
+  showToast("ออกจากระบบผู้ซื้อแล้ว", "info");
+}
+
+function autoFillCustomerData() {
+  const customer = getCurrentCustomer();
+  if (!customer) return;
+
+  const nameInput = document.getElementById("custName");
+  const phoneInput = document.getElementById("custPhone");
+  if (nameInput) nameInput.value = customer.name || "";
+  if (phoneInput) phoneInput.value = customer.phone || "";
+
+  if (customer.buyer_type === "teacher") {
+    switchBuyerType("teacher");
+    const deptSelect = document.getElementById("teacherDept");
+    if (deptSelect && customer.department) {
+      deptSelect.value = customer.department;
+      syncTeacherLocation(customer.department, false);
+    }
+    const locSelect = document.getElementById("teacherLocationSelect");
+    if (locSelect && customer.pickup_location) {
+      locSelect.value = customer.pickup_location;
+    }
+  } else {
+    switchBuyerType("student");
+    const roomInput = document.getElementById("custRoom");
+    const noInput = document.getElementById("custNo");
+    const locInput = document.getElementById("custLocationStudent");
+    if (roomInput) roomInput.value = customer.student_room || "";
+    if (noInput) noInput.value = customer.student_no || "";
+    if (locInput && customer.pickup_location) {
+      locInput.value = customer.pickup_location;
+    }
+  }
+}
+
+function autoFillPreorderCustomerData() {
+  const customer = getCurrentCustomer();
+  if (!customer) return;
+
+  const nameInput = document.getElementById("preCustName");
+  const phoneInput = document.getElementById("preCustPhone");
+  if (nameInput) nameInput.value = customer.name || "";
+  if (phoneInput) phoneInput.value = customer.phone || "";
+
+  if (customer.buyer_type === "teacher") {
+    switchPreorderBuyerType("teacher");
+    const deptSelect = document.getElementById("preTeacherDept");
+    if (deptSelect && customer.department) {
+      deptSelect.value = customer.department;
+      syncTeacherLocation(customer.department, true);
+    }
+  } else {
+    switchPreorderBuyerType("student");
+    const roomInput = document.getElementById("preCustRoom");
+    const noInput = document.getElementById("preCustNo");
+    if (roomInput) roomInput.value = customer.student_room || "";
+    if (noInput) noInput.value = customer.student_no || "";
+  }
+}
+
+function checkPendingOrderAction() {
+  if (pendingCheckoutItems && pendingCheckoutItems.length > 0) {
+    const items = pendingCheckoutItems;
+    pendingCheckoutItems = null;
+    openCheckoutModal(items);
+  }
 }
 
 // ==================== Cart System ====================
@@ -415,13 +1049,30 @@ function syncTeacherLocation(dept, isPreorder = false) {
   }
 }
 
-function openCheckoutModal() {
-  if (cart.length === 0) {
-    showToast("กรุณาเลือกสินค้าลงในตะกร้าก่อนครับ", "error");
+function openCheckoutModal(customItems = null) {
+  if (customItems && Array.isArray(customItems) && customItems.length > 0) {
+    activeCheckoutItems = customItems;
+    isBuyNowFlow = true;
+  } else {
+    if (cart.length === 0) {
+      showToast("กรุณาเลือกสินค้าลงในตะกร้าก่อนครับ", "error");
+      return;
+    }
+    activeCheckoutItems = [...cart];
+    isBuyNowFlow = false;
+  }
+
+  // Check if customer is logged in
+  const current = getCurrentCustomer();
+  if (!current) {
+    showToast("กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อนทำการสั่งซื้อครับ", "info");
+    pendingCheckoutItems = activeCheckoutItems;
+    openCustomerAuthModal('login');
     return;
   }
+
   closeCartModal();
-  switchBuyerType("student"); // ค่าเริ่มต้นคือนักเรียน
+  autoFillCustomerData();
   document.getElementById("checkoutModal").classList.add("active");
 }
 
@@ -455,14 +1106,18 @@ async function handleOrderSubmit(e) {
     return;
   }
 
+  const orderItems = (activeCheckoutItems && activeCheckoutItems.length > 0) ? activeCheckoutItems : cart;
+  const totalPrice = orderItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+
   let orderData = {
     action: "createOrder",
     buyer_type: isTeacher ? "คุณครู" : "นักเรียน",
-    items: cart,
-    total_price: calculateCartTotal(),
+    items: orderItems,
+    total_price: totalPrice,
     student_name: name,
     phone: phone,
-    note: note
+    note: note,
+    customer_email: (getCurrentCustomer() && getCurrentCustomer().email) || "-"
   };
 
   if (isTeacher) {
@@ -543,7 +1198,7 @@ async function handleOrderSubmit(e) {
       localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(localOrders));
 
       // ตัดสต็อกใน Local
-      cart.forEach(c => {
+      orderItems.forEach(c => {
         const p = products.find(prod => String(prod.id) === String(c.id));
         if (p) p.stock = Math.max(0, (Number(p.stock) || 0) - c.quantity);
       });
@@ -556,10 +1211,14 @@ async function handleOrderSubmit(e) {
     myHistory.unshift({ orderId: orderId, date: new Date().toLocaleString("th-TH"), total: orderData.total_price });
     localStorage.setItem("MY_ORDER_HISTORY", JSON.stringify(myHistory));
 
-    // เคลียร์ตะกร้า
-    cart = [];
-    saveCart();
-    updateCartBadge();
+    // เคลียร์ตะกร้าถ้าสั่งซื้อผ่านตะกร้าปกติ (ไม่ใช่ Buy Now แยกชิ้น)
+    if (!isBuyNowFlow) {
+      cart = [];
+      saveCart();
+      updateCartBadge();
+    }
+    activeCheckoutItems = null;
+    isBuyNowFlow = false;
     closeCheckoutModal();
 
     showToast(`สั่งซื้อสำเร็จ! รหัสคำสั่งซื้อ: ${orderId}`, "success");
@@ -568,6 +1227,7 @@ async function handleOrderSubmit(e) {
   } catch (error) {
     console.error("Order error:", error);
     showToast("เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
+  }
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
@@ -660,6 +1320,7 @@ function openPreorderModal() {
   document.getElementById("preorderForm").reset();
   switchPreorderBuyerType("student");
   handleNotifyChannelChange();
+  autoFillPreorderCustomerData();
   document.getElementById("preorderModal").classList.add("active");
 }
 
@@ -670,6 +1331,7 @@ function openPreorderForProduct(productNameEncoded) {
   const nameInput = document.getElementById("preProdName");
   if (nameInput) nameInput.value = prodName;
   handleNotifyChannelChange();
+  autoFillPreorderCustomerData();
   document.getElementById("preorderModal").classList.add("active");
 }
 
@@ -906,6 +1568,7 @@ function showBuyerView() {
   const sellerView = document.getElementById("sellerView");
   if (buyerView) buyerView.style.display = "block";
   if (sellerView) sellerView.style.display = "none";
+  closeProductDetail(true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 

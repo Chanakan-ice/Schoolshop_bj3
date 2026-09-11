@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ร้านค้าหมวดการงานอาชีพ | Career & Occupations Shop</title>
-  <link rel="stylesheet" href="styles.css?v=2.0">
+  <link rel="stylesheet" href="styles.css?v=2.4">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -29,81 +29,124 @@
 
         <div class="nav-links">
           <button class="nav-btn" onclick="openTrackModal()">
-            <i class="fa-solid fa-truck-fast"></i> ติดตามพัสดุ
+            <i class="fa-solid fa-truck-fast"></i> <span>ติดตามพัสดุ</span>
           </button>
           <button class="nav-btn" onclick="openPreorderModal()">
-            <i class="fa-solid fa-calendar-plus"></i> สั่งจองล่วงหน้า
+            <i class="fa-solid fa-calendar-plus"></i> <span>สั่งจองล่วงหน้า</span>
           </button>
           <button class="nav-btn" onclick="openContactModal()">
-            <i class="fa-solid fa-comment-dots"></i> สอบถาม
+            <i class="fa-solid fa-comment-dots"></i> <span>สอบถาม</span>
           </button>
           <button class="nav-btn cart-btn" onclick="openCartModal()">
-            <i class="fa-solid fa-cart-shopping"></i> ตะกร้า
+            <i class="fa-solid fa-cart-shopping"></i> <span>ตะกร้า</span>
             <span class="cart-count" id="cartCount">0</span>
+          </button>
+
+          <!-- Customer Account Badge with Dropdown -->
+          <div class="customer-nav-wrap" id="customerNavWrap">
+            <button class="customer-account-btn" id="customerAccountBtn" onclick="toggleCustomerDropdown()">
+              <span class="user-avatar" id="customerAvatarIcon"><i class="fa-solid fa-user"></i></span>
+              <span class="user-name-text" id="customerNavName">เข้าสู่ระบบ</span>
+              <i class="fa-solid fa-chevron-down" style="font-size: 0.72rem; color: var(--text-muted);"></i>
+            </button>
+            <div class="account-dropdown-menu" id="accountDropdownMenu">
+              <div class="dropdown-user-header" id="dropdownUserHeader" style="display: none;">
+                <div class="dropdown-user-name" id="dropdownUserName">ชื่อผู้ใช้</div>
+                <div class="dropdown-user-email" id="dropdownUserEmail">email@example.com</div>
+              </div>
+              <button class="dropdown-item-btn" id="dropdownLoginBtn" onclick="openCustomerAuthModal('login')">
+                <i class="fa-solid fa-right-to-bracket" style="color: var(--primary);"></i> เข้าสู่ระบบ
+              </button>
+              <button class="dropdown-item-btn" id="dropdownRegisterBtn" onclick="openCustomerAuthModal('register')">
+                <i class="fa-solid fa-user-plus" style="color: #16a34a;"></i> สมัครสมาชิกใหม่
+              </button>
+              <button class="dropdown-item-btn" id="dropdownSwitchBtn" onclick="openCustomerAuthModal('switch')">
+                <i class="fa-solid fa-users" style="color: #ea580c;"></i> สลับบัญชี (<span id="dropdownAccountCount">0</span>)
+              </button>
+              <div class="dropdown-divider" id="dropdownLogoutDivider" style="display: none;"></div>
+              <button class="dropdown-item-btn" id="dropdownLogoutBtn" onclick="logoutCustomer()" style="display: none; color: #dc2626;">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> ออกจากระบบ
+              </button>
+            </div>
+          </div>
+
+          <!-- Top-Right Admin Button -->
+          <button class="nav-btn admin-top-btn" onclick="openAdminAuthModal()" title="เข้าสู่ระบบผู้ดูแล/แอดมิน">
+            <i class="fa-solid fa-user-gear"></i> <span>แอดมิน</span>
           </button>
         </div>
       </div>
     </nav>
 
-    <!-- Hero Banner -->
-    <section class="hero">
-      <div class="hero-container">
-        <div class="hero-badge">
-          <i class="fa-solid fa-leaf"></i> สั่งซื้อผลงาน & ผลผลิตฝีมือนักเรียน ชำระเงินปลายทาง (COD)
-        </div>
-        <h1 class="hero-title">ร้านค้าจำหน่ายผลงาน & ผลิตภัณฑ์หมวดการงานอาชีพ</h1>
-        <p class="hero-subtitle">
-          สนับสนุนผลงานฝีมือนักเรียน ทั้งเบเกอรี่ ขนม อาหาร ผลผลิตเกษตรอินทรีย์ งานประดิษฐ์ งานช่าง และวัสดุอุปกรณ์สำหรับวิชาการงานอาชีพ รับของสะดวกพร้อมชำระเงินปลายทาง
-        </p>
+    <!-- Main Shop Listing View -->
+    <div id="mainShopView">
+      <!-- Hero Banner -->
+      <section class="hero" id="heroSection">
+        <div class="hero-container">
+          <div class="hero-badge">
+            <i class="fa-solid fa-leaf"></i> สั่งซื้อผลงาน & ผลผลิตฝีมือนักเรียน ชำระเงินปลายทาง (COD)
+          </div>
+          <h1 class="hero-title">ร้านค้าจำหน่ายผลงาน & ผลิตภัณฑ์หมวดการงานอาชีพ</h1>
+          <p class="hero-subtitle">
+            สนับสนุนผลงานฝีมือนักเรียน ทั้งเบเกอรี่ ขนม อาหาร ผลผลิตเกษตรอินทรีย์ งานประดิษฐ์ งานช่าง และวัสดุอุปกรณ์สำหรับวิชาการงานอาชีพ รับของสะดวกพร้อมชำระเงินปลายทาง
+          </p>
 
-        <div class="hero-features">
-          <div class="feature-pill">
-            <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
-          </div>
-          <div class="feature-pill">
-            <i class="fa-solid fa-door-open"></i> รับของที่ห้องหมวดการงานหรือห้องเรียน
-          </div>
-          <div class="feature-pill">
-            <i class="fa-solid fa-star"></i> ผลงานฝีมือนักเรียน สดใหม่ ปลอดภัย
+          <div class="hero-features">
+            <div class="feature-pill">
+              <i class="fa-solid fa-hand-holding-dollar"></i> ชำระเงินปลายทาง (COD)
+            </div>
+            <div class="feature-pill">
+              <i class="fa-solid fa-door-open"></i> รับของที่ห้องหมวดการงานหรือห้องเรียน
+            </div>
+            <div class="feature-pill">
+              <i class="fa-solid fa-star"></i> ผลงานฝีมือนักเรียน สดใหม่ ปลอดภัย
+            </div>
           </div>
         </div>
+      </section>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        
+        <!-- Controls (Search & Category Filters) -->
+        <section class="controls-section">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาผลงาน เช่น คุกกี้, ผักสลัด, กระเป๋าผ้า, งานไม้, ชุดอุปกรณ์...">
+          </div>
+
+          <div class="category-pills" id="categoryContainer">
+            <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
+            <button class="cat-pill" data-cat="งานคหกรรม/เบเกอรี่">งานคหกรรม / เบเกอรี่</button>
+            <button class="cat-pill" data-cat="งานเกษตร/ผลผลิต">งานเกษตร / ผลผลิต</button>
+            <button class="cat-pill" data-cat="งานช่าง/งานประดิษฐ์">งานช่าง / งานประดิษฐ์</button>
+            <button class="cat-pill" data-cat="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</button>
+          </div>
+        </section>
+
+        <!-- Product Grid -->
+        <section>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h2 style="font-size: 1.35rem; color: var(--text-main); font-weight: 600;">
+              <i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้า
+            </h2>
+            <span id="productCount" style="font-size: 0.9rem; color: var(--text-muted);">กำลังโหลดสินค้า...</span>
+          </div>
+
+          <div class="products-grid" id="productsGrid">
+            <!-- Products will be injected by app.js -->
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Product Detail Page View -->
+    <div id="productDetailView" style="display: none;" class="main-content">
+      <div class="product-detail-container" id="productDetailContainer">
+        <!-- Rendered by app.js showProductDetail() -->
       </div>
-    </section>
-
-    <!-- Main Content -->
-    <main class="main-content">
-      
-      <!-- Controls (Search & Category Filters) -->
-      <section class="controls-section">
-        <div class="search-box">
-          <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาผลงาน เช่น คุกกี้, ผักสลัด, กระเป๋าผ้า, งานไม้, ชุดอุปกรณ์...">
-        </div>
-
-        <div class="category-pills" id="categoryContainer">
-          <button class="cat-pill active" data-cat="all">ทั้งหมด</button>
-          <button class="cat-pill" data-cat="งานคหกรรม/เบเกอรี่">งานคหกรรม / เบเกอรี่</button>
-          <button class="cat-pill" data-cat="งานเกษตร/ผลผลิต">งานเกษตร / ผลผลิต</button>
-          <button class="cat-pill" data-cat="งานช่าง/งานประดิษฐ์">งานช่าง / งานประดิษฐ์</button>
-          <button class="cat-pill" data-cat="อุปกรณ์การเรียนการงาน">อุปกรณ์การเรียนการงาน</button>
-        </div>
-      </section>
-
-      <!-- Product Grid -->
-      <section>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-          <h2 style="font-size: 1.35rem; color: var(--text-main); font-weight: 600;">
-            <i class="fa-solid fa-layer-group" style="color: var(--primary);"></i> รายการสินค้า
-          </h2>
-          <span id="productCount" style="font-size: 0.9rem; color: var(--text-muted);">กำลังโหลดสินค้า...</span>
-        </div>
-
-        <div class="products-grid" id="productsGrid">
-          <!-- Products will be injected by app.js -->
-        </div>
-      </section>
-
-    </main>
+    </div>
 
     <!-- Buyer Footer -->
     <footer class="footer">
@@ -843,6 +886,145 @@
     </div>
   </div>
 
+  <!-- Modal: Customer Account / Sign In / Register / Multi-Account Switcher -->
+  <div class="modal-overlay" id="customerAuthModal">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title" id="customerAuthTitle">
+          <i class="fa-solid fa-user-circle" style="color: var(--primary);"></i> บัญชีผู้ใช้งาน
+        </div>
+        <button class="close-btn" onclick="closeCustomerAuthModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Tab navigation -->
+        <div class="buyer-type-selector" style="margin-bottom: 1.25rem;">
+          <button type="button" class="type-btn active" id="tabAuthLogin" onclick="switchCustomerAuthTab('login')">
+            <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+          </button>
+          <button type="button" class="type-btn" id="tabAuthRegister" onclick="switchCustomerAuthTab('register')">
+            <i class="fa-solid fa-user-plus"></i> สมัครสมาชิก
+          </button>
+          <button type="button" class="type-btn" id="tabAuthSwitch" onclick="switchCustomerAuthTab('switch')">
+            <i class="fa-solid fa-users"></i> สลับบัญชี (<span id="savedAccountsCount">0</span>)
+          </button>
+        </div>
+
+        <!-- Form 1: Login -->
+        <form id="customerLoginForm" onsubmit="handleCustomerLoginSubmit(event)">
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-envelope"></i> อีเมลของคุณ *</label>
+            <input type="email" id="loginCustomerEmail" class="form-input" placeholder="เช่น student@school.ac.th หรือ email@gmail.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-lock"></i> รหัสผ่าน *</label>
+            <input type="password" id="loginCustomerPassword" class="form-input" placeholder="กรอกรหัสผ่าน" required>
+          </div>
+          <div id="loginAuthError" style="color: #dc2626; font-size: 0.85rem; margin-bottom: 1rem; display: none; background: #fef2f2; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border-left: 3px solid #dc2626;"></div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">
+            <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+          </button>
+          <div style="text-align: center; margin-top: 1rem; font-size: 0.88rem; color: var(--text-muted);">
+            ยังไม่มีบัญชี? <a href="javascript:void(0)" onclick="switchCustomerAuthTab('register')" style="color: var(--primary); font-weight: 600;">สมัครสมาชิกใหม่ที่นี่</a>
+          </div>
+        </form>
+
+        <!-- Form 2: Register -->
+        <form id="customerRegisterForm" style="display: none;" onsubmit="handleCustomerRegisterSubmit(event)">
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-envelope"></i> อีเมลสำหรับเข้าสู่ระบบ *</label>
+            <input type="email" id="regCustomerEmail" class="form-input" placeholder="เช่น student@school.ac.th หรือ user@gmail.com" required>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 3px;">
+              * 1 อุปกรณ์สามารถสมัครและสลับใช้ได้หลายบัญชี
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-lock"></i> รหัสผ่าน *</label>
+            <input type="password" id="regCustomerPassword" class="form-input" placeholder="ตั้งรหัสผ่านอย่างน้อย 4 ตัวอักษร" minlength="4" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ - นามสกุล *</label>
+            <input type="text" id="regCustomerName" class="form-input" placeholder="เช่น เด็กชายมานะ ใจดี หรือ ครูสมศรี" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">สถานะผู้ใช้งาน *</label>
+            <div class="buyer-type-selector" style="margin-bottom: 0.5rem;">
+              <button type="button" class="type-btn active" id="regRoleStudent" onclick="selectRegRole('student')">
+                <i class="fa-solid fa-graduation-cap"></i> นักเรียน
+              </button>
+              <button type="button" class="type-btn" id="regRoleTeacher" onclick="selectRegRole('teacher')">
+                <i class="fa-solid fa-chalkboard-user"></i> คุณครู/บุคลากร
+              </button>
+            </div>
+          </div>
+
+          <!-- Student fields -->
+          <div id="regStudentFields">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">ห้อง (เลขห้อง) *</label>
+                <input type="text" id="regStudentRoom" class="form-input" placeholder="เช่น 2/3, 1/1">
+              </div>
+              <div class="form-group">
+                <label class="form-label">เลขที่</label>
+                <input type="text" id="regStudentNo" class="form-input" placeholder="เช่น 15">
+              </div>
+            </div>
+          </div>
+
+          <!-- Teacher fields -->
+          <div id="regTeacherFields" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">กลุ่มสาระการเรียนรู้ *</label>
+              <select id="regTeacherDept" class="form-select">
+                <option value="กลุ่มสาระการงานอาชีพ">กลุ่มสาระการงานอาชีพ</option>
+                <option value="กลุ่มสาระภาษาไทย">กลุ่มสาระภาษาไทย</option>
+                <option value="กลุ่มสาระคณิตศาสตร์">กลุ่มสาระคณิตศาสตร์</option>
+                <option value="กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี">กลุ่มสาระวิทยาศาสตร์และเทคโนโลยี</option>
+                <option value="กลุ่มสาระสังคมศึกษาฯ">กลุ่มสาระสังคมศึกษาฯ</option>
+                <option value="กลุ่มสาระสุขศึกษาและพลศึกษา">กลุ่มสาระสุขศึกษาและพลศึกษา</option>
+                <option value="กลุ่มสาระศิลปะ">กลุ่มสาระศิลปะ</option>
+                <option value="กลุ่มสาระภาษาต่างประเทศ">กลุ่มสาระภาษาต่างประเทศ</option>
+                <option value="บุคลากร/เจ้าหน้าที่">บุคลากร/เจ้าหน้าที่</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-phone"></i> เบอร์โทรศัพท์ *</label>
+            <input type="tel" id="regCustomerPhone" class="form-input" placeholder="เช่น 0812345678" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-location-dot"></i> จุดนัดรับของที่สะดวกประจำ</label>
+            <input type="text" id="regCustomerPickup" class="form-input" placeholder="เช่น หมวดการงานอาชีพ หรือ ห้องพักครู">
+          </div>
+
+          <div id="regAuthError" style="color: #dc2626; font-size: 0.85rem; margin-bottom: 1rem; display: none; background: #fef2f2; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border-left: 3px solid #dc2626;"></div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">
+            <i class="fa-solid fa-user-plus"></i> สมัครสมาชิกและเข้าสู่ระบบ
+          </button>
+        </form>
+
+        <!-- View 3: Multi-Account Switcher -->
+        <div id="customerSwitchView" style="display: none;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            เลือกบัญชีที่ต้องการสลับใช้งานบนอุปกรณ์นี้:
+          </p>
+          <div class="accounts-list-container" id="savedAccountsList">
+            <!-- Rendered by JS -->
+          </div>
+          <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;" onclick="switchCustomerAuthTab('register')">
+            <i class="fa-solid fa-user-plus"></i> เพิ่มบัญชีอื่นในอุปกรณ์นี้
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Modal 6: Admin Login Gate (กรอกรหัสผ่านอะไรก็ได้ แต่ถ้ากดส่งแล้วถูกต้องจึงเข้าหน้าได้ ถ้าผิดเด้งกลับหน้าผู้ซื้อ) -->
   <div class="modal-overlay" id="adminAuthModal" onclick="if(event.target === this) closeAdminAuthModal()" style="z-index: 99999; backdrop-filter: blur(8px); background: rgba(15, 23, 42, 0.85);">
     <div class="modal-card" id="adminAuthCard" style="max-width: 440px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);">
@@ -913,14 +1095,37 @@
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">จำนวนสต็อก *</label>
-              <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="30" required>
+          <div class="form-group">
+            <label class="form-label">จำนวนสต็อก *</label>
+            <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="30" required>
+          </div>
+
+          <!-- Direct Device Image Upload Dropzone -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-image"></i> รูปภาพสินค้า *</label>
+            
+            <div class="upload-dropzone" id="prodImgDropzone" onclick="document.getElementById('prodImgFileInput').click()">
+              <input type="file" id="prodImgFileInput" accept="image/*" style="display: none;" onchange="handleProductImageFile(this)">
+              <div class="upload-dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+              <div class="upload-dropzone-text">แตะหรือคลิกเพื่อเลือกรูปภาพจากอุปกรณ์</div>
+              <div class="upload-dropzone-sub">รองรับรูปถ่ายจากกล้องมือถือ แกลเลอรี หรือไฟล์ภาพในเครื่อง</div>
             </div>
-            <div class="form-group">
-              <label class="form-label">ลิงก์รูปภาพ (URL)</label>
-              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/...">
+
+            <div class="image-preview-wrapper" id="prodImgPreviewWrapper" style="display: none;">
+              <img src="" id="prodImgPreview" class="image-preview-thumb" alt="Product Preview">
+              <div class="image-preview-actions">
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;" onclick="document.getElementById('prodImgFileInput').click()">
+                  <i class="fa-solid fa-arrows-rotate"></i> เปลี่ยนรูป
+                </button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; color: #dc2626;" onclick="removeProductImage()">
+                  <i class="fa-solid fa-trash"></i> ลบรูป
+                </button>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.5rem;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">หรือระบุลิงก์รูปภาพ (URL ทางเลือก):</span>
+              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/..." style="margin-top: 4px; font-size: 0.85rem;" oninput="handleProductImageUrlInput(this.value)">
             </div>
           </div>
 
@@ -1024,7 +1229,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts: Load seller.js first so its functions are available, then app.js -->
-  <script src="seller.js?v=2.3"></script>
-  <script src="app.js?v=2.3"></script>
+  <script src="seller.js?v=2.4"></script>
+  <script src="app.js?v=2.4"></script>
 </body>
 </html>

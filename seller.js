@@ -495,11 +495,111 @@ function renderMessagesTable() {
   `).join("");
 }
 
-// ==================== Product Form (Add / Edit) ====================
+// ==================== Product Form (Add / Edit) & Device Image Upload ====================
+let uploadedProductImageDataUrl = "";
+
+function compressImage(imgSource, maxWidth = 800, maxHeight = 800, quality = 0.85) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(imgSource);
+    img.src = imgSource;
+  });
+}
+
+async function handleProductImageFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  // Verify it's an image
+  if (!file.type.startsWith("image/")) {
+    showToast("กรุณาเลือกไฟล์รูปภาพเท่านั้น", "error");
+    return;
+  }
+
+  showToast("กำลังประมวลผลรูปภาพ...", "info");
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const rawDataUrl = e.target.result;
+      const compressedDataUrl = await compressImage(rawDataUrl, 800, 800, 0.85);
+      uploadedProductImageDataUrl = compressedDataUrl;
+
+      const previewEl = document.getElementById("prodImgPreview");
+      const wrapperEl = document.getElementById("prodImgPreviewWrapper");
+      const dropzoneEl = document.getElementById("prodImgDropzone");
+      const urlInput = document.getElementById("prodImgInput");
+
+      if (previewEl) previewEl.src = compressedDataUrl;
+      if (wrapperEl) wrapperEl.style.display = "flex";
+      if (dropzoneEl) dropzoneEl.style.display = "none";
+      if (urlInput) urlInput.value = ""; // Clear manual URL
+
+      showToast("อัปโหลดและปรับขนาดรูปภาพสำเร็จ", "success");
+    } catch (err) {
+      console.error("Image processing error:", err);
+      showToast("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ", "error");
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleProductImageUrlInput(url) {
+  const val = (url || "").trim();
+  const previewEl = document.getElementById("prodImgPreview");
+  const wrapperEl = document.getElementById("prodImgPreviewWrapper");
+  const dropzoneEl = document.getElementById("prodImgDropzone");
+
+  if (val) {
+    uploadedProductImageDataUrl = val;
+    if (previewEl) previewEl.src = val;
+    if (wrapperEl) wrapperEl.style.display = "flex";
+    if (dropzoneEl) dropzoneEl.style.display = "none";
+  } else if (!uploadedProductImageDataUrl.startsWith("data:")) {
+    removeProductImage();
+  }
+}
+
+function removeProductImage() {
+  uploadedProductImageDataUrl = "";
+  const fileInput = document.getElementById("prodImgFileInput");
+  const urlInput = document.getElementById("prodImgInput");
+  const previewEl = document.getElementById("prodImgPreview");
+  const wrapperEl = document.getElementById("prodImgPreviewWrapper");
+  const dropzoneEl = document.getElementById("prodImgDropzone");
+
+  if (fileInput) fileInput.value = "";
+  if (urlInput) urlInput.value = "";
+  if (previewEl) previewEl.src = "";
+  if (wrapperEl) wrapperEl.style.display = "none";
+  if (dropzoneEl) dropzoneEl.style.display = "block";
+}
+
 function openAddProductModal() {
   document.getElementById("productModalTitle").innerHTML = '<i class="fa-solid fa-box-open"></i> เพิ่มสินค้าใหม่';
   document.getElementById("productForm").reset();
   document.getElementById("editProductId").value = "";
+  removeProductImage();
   document.getElementById("productModal").classList.add("active");
 }
 
@@ -513,8 +613,22 @@ function openEditProductModal(productId) {
   document.getElementById("prodCatInput").value = prod.category;
   document.getElementById("prodPriceInput").value = prod.price;
   document.getElementById("prodStockInput").value = prod.stock;
-  document.getElementById("prodImgInput").value = prod.image_url || "";
   document.getElementById("prodDescInput").value = prod.description || "";
+
+  if (prod.image_url) {
+    uploadedProductImageDataUrl = prod.image_url;
+    const previewEl = document.getElementById("prodImgPreview");
+    const wrapperEl = document.getElementById("prodImgPreviewWrapper");
+    const dropzoneEl = document.getElementById("prodImgDropzone");
+    const urlInput = document.getElementById("prodImgInput");
+
+    if (previewEl) previewEl.src = prod.image_url;
+    if (wrapperEl) wrapperEl.style.display = "flex";
+    if (dropzoneEl) dropzoneEl.style.display = "none";
+    if (urlInput) urlInput.value = prod.image_url.startsWith("data:") ? "" : prod.image_url;
+  } else {
+    removeProductImage();
+  }
 
   document.getElementById("productModal").classList.add("active");
 }
@@ -526,13 +640,16 @@ function closeProductModal() {
 async function handleProductFormSubmit(e) {
   e.preventDefault();
   const id = document.getElementById("editProductId").value;
+  const manualUrl = document.getElementById("prodImgInput") ? document.getElementById("prodImgInput").value.trim() : "";
+  const finalImage = uploadedProductImageDataUrl || manualUrl || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500";
+
   const data = {
     id: id || ("P" + ("000" + (allProducts.length + 1)).slice(-3)),
     name: document.getElementById("prodNameInput").value.trim(),
     category: document.getElementById("prodCatInput").value,
     price: Number(document.getElementById("prodPriceInput").value) || 0,
     stock: Number(document.getElementById("prodStockInput").value) || 0,
-    image_url: document.getElementById("prodImgInput").value.trim() || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
+    image_url: finalImage,
     description: document.getElementById("prodDescInput").value.trim()
   };
 

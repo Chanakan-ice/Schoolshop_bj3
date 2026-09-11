@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบจัดการร้านค้าหมวดการงานอาชีพ | Career Admin Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2.0">
+  <link rel="stylesheet" href="styles.css?v=2.4">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script>
@@ -358,14 +358,37 @@
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">จำนวนสต็อก *</label>
-              <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="50" required>
+          <div class="form-group">
+            <label class="form-label">จำนวนสต็อก *</label>
+            <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="50" required>
+          </div>
+
+          <!-- Direct Device Image Upload Dropzone -->
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-image"></i> รูปภาพสินค้า *</label>
+            
+            <div class="upload-dropzone" id="prodImgDropzone" onclick="document.getElementById('prodImgFileInput').click()">
+              <input type="file" id="prodImgFileInput" accept="image/*" style="display: none;" onchange="handleProductImageFile(this)">
+              <div class="upload-dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+              <div class="upload-dropzone-text">แตะหรือคลิกเพื่อเลือกรูปภาพจากอุปกรณ์</div>
+              <div class="upload-dropzone-sub">รองรับรูปถ่ายจากกล้องมือถือ แกลเลอรี หรือไฟล์ภาพในเครื่อง</div>
             </div>
-            <div class="form-group">
-              <label class="form-label">ลิงก์รูปภาพ (URL)</label>
-              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/...">
+
+            <div class="image-preview-wrapper" id="prodImgPreviewWrapper" style="display: none;">
+              <img src="" id="prodImgPreview" class="image-preview-thumb" alt="Product Preview">
+              <div class="image-preview-actions">
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;" onclick="document.getElementById('prodImgFileInput').click()">
+                  <i class="fa-solid fa-arrows-rotate"></i> เปลี่ยนรูป
+                </button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; color: #dc2626;" onclick="removeProductImage()">
+                  <i class="fa-solid fa-trash"></i> ลบรูป
+                </button>
+              </div>
+            </div>
+
+            <div style="margin-top: 0.5rem;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">หรือระบุลิงก์รูปภาพ (URL ทางเลือก):</span>
+              <input type="url" id="prodImgInput" class="form-input" placeholder="https://images.unsplash.com/..." style="margin-top: 4px; font-size: 0.85rem;" oninput="handleProductImageUrlInput(this.value)">
             </div>
           </div>
 
@@ -504,6 +527,6 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="seller.js?v=2.3"></script>
+  <script src="seller.js?v=2.4"></script>
 </body>
 </html>
