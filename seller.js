@@ -67,7 +67,7 @@ async function refreshAllData() {
   showToast("กำลังโหลดข้อมูลล่าสุด...", "info");
   await Promise.all([
     loadOrders(),
-    loadProducts(),
+    loadSellerProducts(),
     loadPreorders(),
     loadMessages()
   ]);
@@ -213,12 +213,12 @@ async function changeOrderStatus(orderId, newStatus) {
 }
 
 // 2. Products
-async function loadProducts() {
+async function loadSellerProducts() {
   if (GAS_API_URL) {
     try {
       const res = await fetch(`${GAS_API_URL}?action=getProducts`);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         allProducts = json.data;
         renderProductsTable();
         return;
@@ -228,9 +228,22 @@ async function loadProducts() {
     }
   }
 
-  allProducts = JSON.parse(localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS") || "[]");
+  const savedLocal = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  if (savedLocal) {
+    try {
+      allProducts = JSON.parse(savedLocal);
+    } catch (e) {
+      allProducts = (typeof DEFAULT_PRODUCTS !== "undefined") ? DEFAULT_PRODUCTS : [];
+    }
+  } else if (typeof DEFAULT_PRODUCTS !== "undefined") {
+    allProducts = DEFAULT_PRODUCTS;
+    localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(DEFAULT_PRODUCTS));
+  } else {
+    allProducts = [];
+  }
   renderProductsTable();
 }
+window.loadSellerProducts = loadSellerProducts;
 
 function renderProductsTable() {
   const tbody = document.getElementById("productsTableBody");
@@ -863,10 +876,11 @@ function closeAdminAuthModal() {
   if (input) input.value = "";
   const err = document.getElementById("authErrorMsg");
   if (err) err.style.display = "none";
-  if (typeof showBuyerView === "function") {
-    showBuyerView();
-  } else {
+
+  if (window.location.pathname.endsWith("seller.html")) {
     window.location.href = "index.html";
+  } else if (typeof showBuyerView === "function") {
+    showBuyerView();
   }
 }
 window.closeAdminAuthModal = closeAdminAuthModal;
@@ -876,43 +890,44 @@ function handleAdminLogin(e) {
   const input = document.getElementById("adminPasswordInput");
   const errorEl = document.getElementById("authErrorMsg");
   const card = document.getElementById("adminAuthCard");
-  const enteredPass = input ? input.value : "";
-  const currentPassword = localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "admin1234";
+  const enteredPass = (input ? input.value : "").trim();
+  const savedPassword = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "").trim();
 
-  if (enteredPass === currentPassword) {
+  // รหัสผ่านเริ่มต้นคือ admin1234 หรือรหัสที่ตั้งไว้
+  const isCorrect = (enteredPass === "admin1234") || (savedPassword && enteredPass === savedPassword);
+
+  if (isCorrect) {
     sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
     sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
     const modal = document.getElementById("adminAuthModal");
     if (modal) modal.classList.remove("active");
     if (errorEl) errorEl.style.display = "none";
     if (input) input.value = "";
-    showToast("เข้าสู่ระบบแดชบอร์ดผู้ขายสำเร็จ", "success");
+    showToast("เข้าสู่ระบบแดชบอร์ดแอดมินสำเร็จ", "success");
+
     if (typeof showSellerView === "function") {
       showSellerView();
+    } else {
+      refreshAllData();
     }
-    refreshAllData();
   } else {
-    // รหัสผ่านไม่ถูกต้อง -> "ถ้ากดเข้าหน้าแอดมินแต่กรอกรหัสไม่ได้ก้ให้เด้งมาหน้าผู้ซื้อเหมือนเดิม"
-    if (errorEl) errorEl.style.display = "block";
+    // รหัสผ่านไม่ถูกต้อง -> แสดงข้อความแจ้งเตือน และให้ผู้ใช้ลองพิมพ์ใหม่ทันที
+    if (errorEl) {
+      errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กรุณากรอกใหม่อีกครั้ง (ค่าเริ่มต้นคือ <code>admin1234</code>)';
+      errorEl.style.display = "block";
+    }
     if (card) {
       card.classList.add("shake-anim");
       setTimeout(() => card.classList.remove("shake-anim"), 450);
     }
-    showToast("รหัสผ่านไม่ถูกต้อง! กำลังนำท่านกลับสู่หน้าร้านค้าผู้ซื้อ...", "error");
-
-    setTimeout(() => {
-      const modal = document.getElementById("adminAuthModal");
-      if (modal) modal.classList.remove("active");
-      if (input) input.value = "";
-      if (errorEl) errorEl.style.display = "none";
-      if (typeof showBuyerView === "function") {
-        showBuyerView();
-      } else {
-        window.location.href = "index.html";
-      }
-    }, 1100);
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+    showToast("รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง", "error");
   }
 }
+window.handleAdminLogin = handleAdminLogin;
 
 function logoutAdmin() {
   sessionStorage.removeItem("IS_SELLER_LOGGED_IN");

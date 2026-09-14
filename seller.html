@@ -4,14 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบจัดการร้านค้าหมวดการงานอาชีพ | Career Admin Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2.4">
+  <link rel="stylesheet" href="styles.css?v=2.5">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script>
-    // หากเปิดหน้านี้โดยยังไม่ได้ล็อกอิน ให้พาไปหน้าร้านค้า index.html ทันที
-    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") !== "true" && sessionStorage.getItem("CAREER_ADMIN_AUTH") !== "true") {
-      window.location.replace("index.html");
-    }
+    // ตรวจสอบการล็อกอินเมื่อเปิด seller.html หากยังไม่ล็อกอิน ให้แสดงหน้าต่างกรอกรหัสผ่าน
+    document.addEventListener("DOMContentLoaded", () => {
+      const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" || sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
+      const authModal = document.getElementById("adminAuthModal");
+      if (!isAuth) {
+        if (authModal) authModal.classList.add("active");
+      }
+    });
   </script>
 </head>
 <body>
@@ -527,6 +531,6 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="seller.js?v=2.4"></script>
+  <script src="seller.js?v=2.5"></script>
 </body>
 </html>

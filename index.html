@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ร้านค้าหมวดการงานอาชีพ | Career & Occupations Shop</title>
-  <link rel="stylesheet" href="styles.css?v=2.4">
+  <link rel="stylesheet" href="styles.css?v=2.5">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -70,9 +70,9 @@
             </div>
           </div>
 
-          <!-- Top-Right Admin Button -->
-          <button class="nav-btn admin-top-btn" onclick="openAdminAuthModal()" title="เข้าสู่ระบบผู้ดูแล/แอดมิน">
-            <i class="fa-solid fa-user-gear"></i> <span>แอดมิน</span>
+          <!-- Top-Right Admin Button (จุดเข้าแดชบอร์ดแอดมินจุดเดียวของเว็บ) -->
+          <button class="nav-btn admin-top-btn" id="navAdminBtn" onclick="openAdminAuthModal()" title="เข้าสู่ระบบผู้ดูแล/แอดมิน">
+            <i class="fa-solid fa-shield-halved"></i> <span class="admin-btn-label">แอดมิน</span>
           </button>
         </div>
       </div>
@@ -153,11 +153,6 @@
       <div class="footer-content">
         <p style="font-weight: 600; color: var(--primary-dark);">🌱 ระบบร้านค้าผลงานและผลิตภัณฑ์หมวดการงานอาชีพ (CareerShop)</p>
         <p>จำหน่ายผลผลิต งานฝีมือ และอุปกรณ์การเรียน | สนับสนุนการเรียนรู้และทักษะอาชีพนักเรียน</p>
-        <div style="margin-top: 0.5rem;">
-          <button class="btn btn-secondary" onclick="openAdminAuthModal()" style="font-size: 0.85rem; padding: 0.4rem 0.9rem;">
-            <i class="fa-solid fa-gear"></i> จัดการร้านค้า (เฉพาะแอดมินหลังร้าน)
-          </button>
-        </div>
         <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">© 2026 CareerShop. กลุ่มสาระการเรียนรู้การงานอาชีพ</p>
       </div>
     </footer>
@@ -1042,14 +1037,17 @@
         <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
-            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านเข้าแดชบอร์ด (ค่าเริ่มต้น: admin1234)" autofocus required>
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่าน (ค่าเริ่มต้น: admin1234)" autofocus required autocomplete="current-password">
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+              * รหัสผ่านเริ่มต้นจากระบบคือ <code>admin1234</code>
+            </div>
           </div>
-          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.88rem; margin-top: -0.5rem; margin-bottom: 1rem; display: none; background: #fef2f2; padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--danger);">
-            <i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กำลังนำท่านกลับสู่หน้าร้านค้าผู้ซื้อ...
+          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.88rem; margin-top: -0.25rem; margin-bottom: 1rem; display: none; background: #fef2f2; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid var(--danger);">
+            <i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กรุณากรอกใหม่อีกครั้ง (หรือใช้รหัสเริ่มต้น <code>admin1234</code>)
           </div>
           <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-            <button type="submit" class="btn btn-primary btn-block" style="padding: 0.75rem;">
-              <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด
+            <button type="submit" class="btn btn-primary btn-block" style="padding: 0.75rem; font-size: 1rem;">
+              <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ดแอดมิน
             </button>
             <button type="button" class="btn btn-secondary btn-block" onclick="closeAdminAuthModal()">
               <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าผู้ซื้อ
@@ -1229,7 +1227,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts: Load seller.js first so its functions are available, then app.js -->
-  <script src="seller.js?v=2.4"></script>
-  <script src="app.js?v=2.4"></script>
+  <script src="seller.js?v=2.5"></script>
+  <script src="app.js?v=2.5"></script>
 </body>
 </html>
