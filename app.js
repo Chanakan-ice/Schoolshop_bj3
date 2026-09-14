@@ -1635,8 +1635,8 @@ function handleAdminLogin(e) {
   const enteredPass = (input ? input.value : "").trim();
   const savedPass = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "").trim();
 
-  // ยอมรับรหัสหลัก admin1234 หรือรหัสที่บันทึกไว้
-  const isMatch = (enteredPass === "admin1234") || (savedPass && enteredPass === savedPass);
+  // ยอมรับรหัสหลัก admin1234 (ไม่สนตัวพิมพ์เล็กพิมพ์ใหญ่) หรือรหัสที่บันทึกไว้
+  const isMatch = (enteredPass.toLowerCase() === "admin1234") || (savedPass && enteredPass === savedPass);
 
   if (isMatch) {
     // รหัสผ่านถูกต้อง -> อนุญาตให้เข้าสู่หน้าแดชบอร์ดแอดมิน

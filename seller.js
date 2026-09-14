@@ -893,8 +893,8 @@ function handleAdminLogin(e) {
   const enteredPass = (input ? input.value : "").trim();
   const savedPassword = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "").trim();
 
-  // รหัสผ่านเริ่มต้นคือ admin1234 หรือรหัสที่ตั้งไว้
-  const isCorrect = (enteredPass === "admin1234") || (savedPassword && enteredPass === savedPassword);
+  // รหัสผ่านเริ่มต้นคือ admin1234 (ไม่สนตัวพิมพ์เล็กพิมพ์ใหญ่) หรือรหัสที่ตั้งไว้
+  const isCorrect = (enteredPass.toLowerCase() === "admin1234") || (savedPassword && enteredPass === savedPassword);
 
   if (isCorrect) {
     sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
