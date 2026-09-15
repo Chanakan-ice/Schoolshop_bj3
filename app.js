@@ -5,21 +5,55 @@
  * ==============================================================================
  */
 
-// URL สำหรับเชื่อมต่อ Google Apps Script Web API (ผูกกับ Google Sheets อัตโนมัติ)
-var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbxMhd31R5kY5n1MXObzkc0UFqE0uaxgb07zOxwRufEbppj0ThoWKWJACFP8tMWEabH7/exec";
+// API Backend Endpoint บน Vercel (/api/shop) แทน Google Apps Script
+var DEFAULT_API_URL = "/api/shop";
 var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
-  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
-  if (!url || !url.startsWith("https://script.google.com/macros/s/") || url.includes("AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw")) {
-    url = DEFAULT_GAS_URL;
-    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_GAS_URL);
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_API_URL || "").trim();
+  // หากยังเป็น URL ของ Google Apps Script เดิม ให้รีเซ็ตมาใช้ /api/shop อัตโนมัติ
+  if (url.includes("script.google.com")) {
+    url = DEFAULT_API_URL;
+    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_API_URL);
   }
-  return url;
+  return url || DEFAULT_API_URL;
 }
 
-var GAS_API_URL = getActiveApiUrl();
-window.GAS_API_URL = GAS_API_URL;
+var API_URL = getActiveApiUrl();
+var GAS_API_URL = API_URL; // ให้เข้ากันได้กับตัวแปรเดิม
+window.API_URL = API_URL;
+window.GAS_API_URL = API_URL;
+
+// Supabase Direct Client Helper (หากมีการตั้งค่า URL และ Anon Key ไว้)
+function getSupabaseConfig() {
+  const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
+  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || "").trim();
+  if (url && key) {
+    return { url, key };
+  }
+  return null;
+}
+
+async function supabaseFetch(endpoint, options = {}) {
+  const config = getSupabaseConfig();
+  if (!config) return null;
+
+  const url = `${config.url}/rest/v1/${endpoint}`;
+  const headers = {
+    "apikey": config.key,
+    "Authorization": `Bearer ${config.key}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+    ...(options.headers || {})
+  };
+
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  return await res.json();
+}
 
 // ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ
 const DEFAULT_PRODUCTS = [
@@ -138,9 +172,25 @@ async function loadProducts() {
   const countEl = document.getElementById("productCount");
   if (countEl) countEl.innerText = "กำลังโหลดข้อมูล...";
 
-  if (GAS_API_URL) {
+  // 1. ลองดึงจาก Supabase โดยตรงหากมี config
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=getProducts`);
+      const data = await supabaseFetch("products?select=*&order=created_at.desc");
+      if (Array.isArray(data) && data.length > 0) {
+        products = data;
+        renderProducts();
+        return;
+      }
+    } catch (sbErr) {
+      console.warn("Supabase fetch failed, fallback to API:", sbErr);
+    }
+  }
+
+  // 2. ลองดึงผ่าน Vercel Serverless Function API
+  if (API_URL) {
+    try {
+      const res = await fetch(`${API_URL}?action=getProducts`);
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         products = json.data;
@@ -148,7 +198,7 @@ async function loadProducts() {
         return;
       }
     } catch (err) {
-      console.warn("ไม่สามารถดึงข้อมูลจาก GAS API ได้ ใช้ข้อมูลในเครื่องแทน:", err);
+      console.warn("ไม่สามารถดึงข้อมูลจาก API ได้ ใช้ข้อมูลในเครื่องแทน:", err);
     }
   }
 
@@ -1163,48 +1213,75 @@ async function handleOrderSubmit(e) {
 
   try {
     let orderId = "ORD-" + Date.now().toString().slice(-6);
-    const targetGasUrl = getActiveApiUrl();
+    
+    // 1. ลองบันทึกลง Supabase โดยตรงหากมีการตั้งค่า
+    const sbConfig = getSupabaseConfig();
+    let isSavedToRemote = false;
 
-    if (targetGasUrl) {
+    if (sbConfig) {
       try {
-        const response = await fetch(targetGasUrl, {
+        const orderRecord = {
+          order_id: orderId,
+          timestamp: new Date().toLocaleString("th-TH"),
+          student_name: orderData.student_name,
+          student_class: orderData.student_class,
+          student_room: orderData.student_room,
+          student_no: orderData.student_no,
+          phone: orderData.phone,
+          pickup_location: orderData.pickup_location,
+          items_json: JSON.stringify(orderData.items || []),
+          total_price: Number(orderData.total_price) || 0,
+          payment_method: orderData.payment_method || "ชำระเงินปลายทาง (COD)",
+          status: "รอดำเนินการ",
+          note: orderData.note || ""
+        };
+        await supabaseFetch("orders", {
           method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(orderRecord)
+        });
+        isSavedToRemote = true;
+      } catch (sbOrderErr) {
+        console.warn("Supabase direct order insert failed, trying API:", sbOrderErr);
+      }
+    }
+
+    // 2. ลองส่งไปยัง Vercel API (/api/shop)
+    const targetApiUrl = getActiveApiUrl();
+    if (!isSavedToRemote && targetApiUrl) {
+      try {
+        const response = await fetch(targetApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(orderData)
         });
         const result = await response.json();
         if (result.success && result.order_id) {
           orderId = result.order_id;
+          isSavedToRemote = true;
         }
       } catch (postErr) {
-        console.warn("GAS fetch POST failed (possibly file:/// or CORS), attempting fallback:", postErr);
-        fetch(targetGasUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(orderData)
-        }).catch(e => console.warn("no-cors order err:", e));
+        console.warn("API fetch POST failed:", postErr);
       }
-    } else {
-      // บันทึกลง LocalStorage กรณีไม่มี API
-      const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
-      const newLocalOrder = {
-        order_id: orderId,
-        timestamp: new Date().toLocaleString("th-TH"),
-        ...orderData,
-        status: "รอดำเนินการ"
-      };
-      localOrders.unshift(newLocalOrder);
-      localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(localOrders));
-
-      // ตัดสต็อกใน Local
-      orderItems.forEach(c => {
-        const p = products.find(prod => String(prod.id) === String(c.id));
-        if (p) p.stock = Math.max(0, (Number(p.stock) || 0) - c.quantity);
-      });
-      localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
-      renderProducts();
     }
+
+    // 3. จัดเก็บลง Local Storage เพื่อรองรับการแสดงผลและตัดสต็อกในเครื่อง
+    const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
+    const newLocalOrder = {
+      order_id: orderId,
+      timestamp: new Date().toLocaleString("th-TH"),
+      ...orderData,
+      status: "รอดำเนินการ"
+    };
+    localOrders.unshift(newLocalOrder);
+    localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(localOrders));
+
+    // ตัดสต็อกใน Local
+    orderItems.forEach(c => {
+      const p = products.find(prod => String(prod.id) === String(c.id));
+      if (p) p.stock = Math.max(0, (Number(p.stock) || 0) - c.quantity);
+    });
+    localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
+    renderProducts();
 
     // บันทึกคำสั่งซื้อล่าสุดของผู้ใช้ไว้ในเครื่องเพื่อให้เช็กง่ายๆ
     const myHistory = JSON.parse(localStorage.getItem("MY_ORDER_HISTORY") || "[]");

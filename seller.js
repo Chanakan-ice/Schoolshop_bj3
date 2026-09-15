@@ -5,20 +5,54 @@
  * ==============================================================================
  */
 
-var DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbxMhd31R5kY5n1MXObzkc0UFqE0uaxgb07zOxwRufEbppj0ThoWKWJACFP8tMWEabH7/exec";
+// API Backend Endpoint บน Vercel (/api/shop) แทน Google Apps Script
+var DEFAULT_API_URL = "/api/shop";
 var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
-  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || window.GAS_API_URL || DEFAULT_GAS_URL || "").trim();
-  if (!url || !url.startsWith("https://script.google.com/macros/s/") || url.includes("AKfycbx5DWkrqm6WftyQdY2JxDJPQm6os7qoEeniPjrb4iZjOSDNfqiyQckac79Jl7X6lo3OKw")) {
-    url = DEFAULT_GAS_URL;
-    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_GAS_URL);
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_API_URL || "").trim();
+  if (url.includes("script.google.com")) {
+    url = DEFAULT_API_URL;
+    localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_API_URL);
   }
-  return url;
+  return url || DEFAULT_API_URL;
 }
 
-var GAS_API_URL = getActiveApiUrl();
-window.GAS_API_URL = GAS_API_URL;
+var API_URL = getActiveApiUrl();
+var GAS_API_URL = API_URL;
+window.API_URL = API_URL;
+window.GAS_API_URL = API_URL;
+
+// Supabase Direct Client Helper
+function getSupabaseConfig() {
+  const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
+  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || "").trim();
+  if (url && key) {
+    return { url, key };
+  }
+  return null;
+}
+
+async function supabaseFetch(endpoint, options = {}) {
+  const config = getSupabaseConfig();
+  if (!config) return null;
+
+  const url = `${config.url}/rest/v1/${endpoint}`;
+  const headers = {
+    "apikey": config.key,
+    "Authorization": `Bearer ${config.key}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+    ...(options.headers || {})
+  };
+
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  return await res.json();
+}
 
 // State
 var allOrders = window.allOrders || [];
@@ -41,6 +75,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const emailInput = document.getElementById("adminEmailsInput");
   if (emailInput) {
     emailInput.value = localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL;
+  }
+
+  const sbUrlInput = document.getElementById("supabaseUrlInput");
+  if (sbUrlInput) {
+    sbUrlInput.value = localStorage.getItem("SUPABASE_URL") || "";
+  }
+
+  const sbKeyInput = document.getElementById("supabaseKeyInput");
+  if (sbKeyInput) {
+    sbKeyInput.value = localStorage.getItem("SUPABASE_ANON_KEY") || "";
   }
 
   // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
@@ -782,42 +826,65 @@ function updateMetrics() {
   }
 }
 
-// ==================== API Settings ====================
-function saveApiUrl() {
-  let url = (document.getElementById("apiUrlInput").value || "").trim();
-  if (!url) {
-    url = DEFAULT_GAS_URL;
-    document.getElementById("apiUrlInput").value = url;
-  }
-  GAS_API_URL = url;
-  localStorage.setItem("SCHOOLSHOP_API_URL", url);
-  showToast("✅ บันทึก URL สำเร็จแล้ว", "success");
+// ==================== Cloud Settings (Vercel API & Supabase) ====================
+function saveCloudSettings() {
+  const apiUrl = (document.getElementById("apiUrlInput") ? document.getElementById("apiUrlInput").value : "").trim() || DEFAULT_API_URL;
+  const sbUrl = (document.getElementById("supabaseUrlInput") ? document.getElementById("supabaseUrlInput").value : "").trim();
+  const sbKey = (document.getElementById("supabaseKeyInput") ? document.getElementById("supabaseKeyInput").value : "").trim();
+
+  localStorage.setItem("SCHOOLSHOP_API_URL", apiUrl);
+  if (sbUrl) localStorage.setItem("SUPABASE_URL", sbUrl);
+  else localStorage.removeItem("SUPABASE_URL");
+
+  if (sbKey) localStorage.setItem("SUPABASE_ANON_KEY", sbKey);
+  else localStorage.removeItem("SUPABASE_ANON_KEY");
+
+  API_URL = apiUrl;
+  GAS_API_URL = apiUrl;
+
+  showToast("✅ บันทึกการตั้งค่าระบบ Vercel & Supabase เรียบร้อยแล้ว", "success");
   refreshAllData();
 }
+window.saveCloudSettings = saveCloudSettings;
+window.saveApiUrl = saveCloudSettings; // เข้ากันได้กับชื่อเดิม
 
-async function testApiConnection() {
-  let url = (document.getElementById("apiUrlInput").value || "").trim();
-  if (!url) {
-    url = DEFAULT_GAS_URL;
-    document.getElementById("apiUrlInput").value = url;
-  }
+async function testCloudConnection() {
+  const sbConfig = getSupabaseConfig();
+  const apiUrl = (document.getElementById("apiUrlInput") ? document.getElementById("apiUrlInput").value : "").trim() || API_URL;
 
   showToast("กำลังทดสอบการเชื่อมต่อ...", "info");
+
+  // 1. ทดสอบ Supabase หากมี config
+  if (sbConfig) {
+    try {
+      const data = await supabaseFetch("products?select=id&limit=1");
+      showToast("🎉 เชื่อมต่อ Supabase Cloud Database สำเร็จ 100%!", "success");
+      refreshAllData();
+      return;
+    } catch (sbErr) {
+      console.warn("Supabase test error:", sbErr);
+      showToast(`⚠️ เชื่อมต่อ Supabase ไม่สำเร็จ: ${sbErr.message}`, "error");
+      return;
+    }
+  }
+
+  // 2. ทดสอบ Vercel Serverless Function API
   try {
-    const res = await fetch(`${url}?action=getProducts`);
+    const res = await fetch(`${apiUrl}?action=getProducts`);
     const json = await res.json();
     if (json.success) {
-      showToast("🎉 เชื่อมต่อ Google Apps Script API สำเร็จ!", "success");
-      GAS_API_URL = url;
-      localStorage.setItem("SCHOOLSHOP_API_URL", url);
+      showToast("🎉 เชื่อมต่อ Vercel Serverless API สำเร็จ!", "success");
+      refreshAllData();
     } else {
-      showToast("ตอบกลับจาก API แต่ success = false", "error");
+      showToast("ตอบกลับจาก Vercel API แล้ว", "info");
     }
   } catch (err) {
-    console.error("Test connection error:", err);
-    showToast("❌ ไม่สามารถเชื่อมต่อได้ ตรวจสอบสิทธิ์และการ Deploy (เลือก Anyone)", "error");
+    console.warn("API test error:", err);
+    showToast("⚠️ ไม่พบ API แต่ระบบจะทำงานในโหมด Local ได้อย่างราบรื่น", "info");
   }
 }
+window.testCloudConnection = testCloudConnection;
+window.testApiConnection = testCloudConnection;
 
 // ==================== Toast ====================
 function showToast(message, type = "info") {

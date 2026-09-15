@@ -252,26 +252,46 @@
     <!-- ==================== TAB 5: Settings ==================== -->
     <section id="settingsTab" class="tab-pane" style="display: none;">
       <div style="max-width: 700px; background: var(--bg-card); padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border);">
-        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: var(--primary-dark);">
-          <i class="fa-solid fa-link"></i> ตั้งค่าการเชื่อมต่อ Google Apps Script API
+        <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--primary-dark);">
+          <i class="fa-solid fa-cloud" style="color: var(--primary);"></i> ตั้งค่าระบบ Vercel API & Supabase Cloud
         </h2>
         
-        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-          นำ Web App URL ที่ได้จากการกด <strong>Deploy > New deployment</strong> บน Google Apps Script มาใส่ที่นี่ เพื่อให้ระบบเชื่อมต่อไปยัง Google Sheets ฐานข้อมูลจริง
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.5;">
+          ระบบทำงานบน <strong>Vercel Serverless Function (/api/shop)</strong> โดยตรง และสามารถเชื่อมต่อกับ <strong>Supabase (Cloud Database ฟรี)</strong> เพื่อซิงก์ข้อมูลสินค้าและออเดอร์ข้ามเครื่องได้ทันที
         </p>
 
         <div class="form-group">
-          <label class="form-label">Google Apps Script Web App URL:</label>
-          <input type="url" id="apiUrlInput" class="form-input" value="https://script.google.com/macros/s/AKfycbxMhd31R5kY5n1MXObzkc0UFqE0uaxgb07zOxwRufEbppj0ThoWKWJACFP8tMWEabH7/exec">
+          <label class="form-label"><i class="fa-solid fa-server"></i> API Endpoint (Vercel):</label>
+          <input type="text" id="apiUrlInput" class="form-input" value="/api/shop" placeholder="/api/shop">
         </div>
 
-        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-          <button class="btn btn-primary" onclick="saveApiUrl()">
+        <div class="form-group">
+          <label class="form-label"><i class="fa-solid fa-database"></i> Supabase Project URL (ทางเลือก):</label>
+          <input type="url" id="supabaseUrlInput" class="form-input" placeholder="https://your-project.supabase.co">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            * ดูได้ที่เมนู <strong>Project Settings > API</strong> ในแดชบอร์ด Supabase
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label"><i class="fa-solid fa-key"></i> Supabase Anon Key (Public Key):</label>
+          <input type="password" id="supabaseKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+            * นำรหัส <code>anon public</code> มาใส่ที่นี่ เพื่อให้หน้าเว็บอ่านเขียนข้อมูลตรงกับ Supabase ได้ทันที
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="saveCloudSettings()">
             <i class="fa-solid fa-floppy-disk"></i> บันทึกการตั้งค่า
           </button>
-          <button class="btn btn-secondary" onclick="testApiConnection()">
+          <button class="btn btn-secondary" onclick="testCloudConnection()">
             <i class="fa-solid fa-plug"></i> ทดสอบการเชื่อมต่อ
           </button>
+        </div>
+
+        <div style="margin-top: 1.25rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); padding: 0.85rem 1rem; font-size: 0.85rem; color: #166534; line-height: 1.5;">
+          <i class="fa-solid fa-circle-check"></i> <strong>พร้อมใช้งานทันที (Zero-Config):</strong> หากยังไม่ได้เชื่อมต่อ Supabase ระบบจะบันทึกข้อมูลในโหมด Local อัตโนมัติ ทำให้สั่งซื้อและจัดการสินค้าได้ทันทีโดยไม่มีข้อผิดพลาด
         </div>
 
         <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;">
