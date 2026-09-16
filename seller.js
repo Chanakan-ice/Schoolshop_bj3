@@ -54,9 +54,88 @@ async function supabaseFetch(endpoint, options = {}) {
   return await res.json();
 }
 
+// ข้อมูลจำลองเริ่มต้น (Mock Data) สำหรับหมวดการงานอาชีพ
+const DEFAULT_PRODUCTS = [
+  {
+    id: "P001",
+    name: "คุกกี้เนยสด ช็อกโกแลตชิพ (ฝีมือนักเรียน)",
+    category: "งานคหกรรม/เบเกอรี่",
+    price: 35,
+    stock: 30,
+    description: "คุกกี้หอมเนยแท้ กรอบอร่อย ผลงานนักเรียนแผนกคหกรรม อบสดใหม่ทุกวัน",
+    image_url: "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=500&auto=format&fit=crop&q=60"
+  },
+  {
+    id: "P002",
+    name: "ผักสลัดไฮโดรโปนิกส์ ปลอดสารเคมี",
+    category: "งานเกษตร/ผลผลิต",
+    price: 30,
+    stock: 25,
+    description: "ผักสลัดกรีนโอ๊ค-เรดโอ๊ค สด กรอบ สะอาด ปลูกโดยนักเรียนชมรมเกษตรอินทรีย์",
+    image_url: "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=60"
+  },
+  {
+    id: "P003",
+    name: "กระเป๋าผ้ารักษ์โลก ลายเพ้นท์แฮนด์เมด",
+    category: "งานช่าง/งานประดิษฐ์",
+    price: 79,
+    stock: 15,
+    description: "กระเป๋าผ้าแคนวาสอย่างดี เพ้นท์ลายศิลปะประดิษฐ์ใบต่อใบ มีเอกลักษณ์ไม่ซ้ำใคร",
+    image_url: "https://images.unsplash.com/photo-1544816155-12df9643f363?w=500&auto=format&fit=crop&q=60"
+  },
+  {
+    id: "P004",
+    name: "น้ำอัญชันมะนาว สดชื่น (ขวด 250ml)",
+    category: "งานคหกรรม/เบเกอรี่",
+    price: 15,
+    stock: 40,
+    description: "น้ำสมุนไพรต้มสด หวานอมเปรี้ยว สดชื่น ดับกระหาย จากแปลงสมุนไพรโรงเรียน",
+    image_url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=500&auto=format&fit=crop&q=60"
+  },
+  {
+    id: "P005",
+    name: "ที่รองแก้วไม้สัก ฉลุลายประดิษฐ์",
+    category: "งานช่าง/งานประดิษฐ์",
+    price: 45,
+    stock: 20,
+    description: "ผลงานจากห้องปฏิบัติการงานช่าง ขัดเรียบ เคลือบเงากันน้ำ สวยงามทนทาน",
+    image_url: "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=500&auto=format&fit=crop&q=60"
+  },
+  {
+    id: "P006",
+    name: "ชุดอุปกรณ์ตัดเย็บเบื้องต้น (พกพา)",
+    category: "อุปกรณ์การเรียนการงาน",
+    price: 55,
+    stock: 30,
+    description: "ประกอบด้วย กรรไกรตัดด้าย เข็ม ด้ายหลากสี สายวัด และที่เลาะ สำหรับวิชาการงาน",
+    image_url: "https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60"
+  }
+];
+
+function getApiHeaders(customHeaders = {}) {
+  const headers = { ...customHeaders };
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    headers["X-Supabase-Url"] = sbConfig.url;
+    headers["X-Supabase-Key"] = sbConfig.key;
+  }
+  return headers;
+}
+
 // State
+function getInitialSellerProducts() {
+  const saved = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
+  return [...DEFAULT_PRODUCTS];
+}
+
 var allOrders = window.allOrders || [];
-var allProducts = window.allProducts || [];
+var allProducts = getInitialSellerProducts();
 var allPreorders = window.allPreorders || [];
 var allMessages = window.allMessages || [];
 
@@ -258,32 +337,49 @@ async function changeOrderStatus(orderId, newStatus) {
 
 // 2. Products
 async function loadSellerProducts() {
+  // 1. ลองดึงจาก Supabase โดยตรงหากมี config
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      const data = await supabaseFetch("products?select=*&order=created_at.desc");
+      if (Array.isArray(data) && data.length > 0) {
+        allProducts = data;
+        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
+        renderProductsTable();
+        return;
+      }
+    } catch (sbErr) {
+      console.warn("Supabase products fetch failed:", sbErr);
+    }
+  }
+
+  // 2. ลองดึงผ่าน API
   if (GAS_API_URL) {
     try {
       const res = await fetch(`${GAS_API_URL}?action=getProducts`);
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         allProducts = json.data;
+        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
         renderProductsTable();
         return;
       }
     } catch (e) {
-      console.warn("GAS Products fetch failed:", e);
+      console.warn("API Products fetch failed:", e);
     }
   }
 
+  // 3. ดึงจาก Local Storage หรือ Mock Data
   const savedLocal = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
   if (savedLocal) {
     try {
       allProducts = JSON.parse(savedLocal);
     } catch (e) {
-      allProducts = (typeof DEFAULT_PRODUCTS !== "undefined") ? DEFAULT_PRODUCTS : [];
+      allProducts = DEFAULT_PRODUCTS;
     }
-  } else if (typeof DEFAULT_PRODUCTS !== "undefined") {
+  } else {
     allProducts = DEFAULT_PRODUCTS;
     localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(DEFAULT_PRODUCTS));
-  } else {
-    allProducts = [];
   }
   renderProductsTable();
 }
@@ -712,20 +808,41 @@ async function handleProductFormSubmit(e) {
 
   showToast("กำลังบันทึกสินค้า...", "info");
 
+  // 1. ส่งตรงไป Supabase หากเชื่อมต่อไว้
+  try {
+    const sbConfig = getSupabaseConfig();
+    if (sbConfig) {
+      if (id) {
+        await supabaseFetch(`products?id=eq.${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data)
+        });
+      } else {
+        await supabaseFetch("products", {
+          method: "POST",
+          body: JSON.stringify(data)
+        });
+      }
+    }
+  } catch (sbErr) {
+    console.warn("Supabase product save failed:", sbErr);
+  }
+
+  // 2. ส่งผ่าน API (/api/shop)
   if (GAS_API_URL) {
     try {
       const action = id ? "updateProduct" : "addProduct";
       await fetch(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: action, ...data })
       });
     } catch (err) {
-      console.warn("GAS product save failed:", err);
+      console.warn("API product save failed:", err);
     }
   }
 
-  // Local Storage update
+  // 3. อัปเดต Local Storage เสมอ
   if (id) {
     const idx = allProducts.findIndex(p => String(p.id) === String(id));
     if (idx > -1) allProducts[idx] = { ...allProducts[idx], ...data };
@@ -743,11 +860,24 @@ async function handleProductFormSubmit(e) {
 async function deleteProduct(productId) {
   if (!confirm(`คุณต้องการลบสินค้ารหัส ${productId} ใช่หรือไม่?`)) return;
 
+  // 1. ลบจาก Supabase หากเชื่อมต่อไว้
+  try {
+    const sbConfig = getSupabaseConfig();
+    if (sbConfig) {
+      await supabaseFetch(`products?id=eq.${productId}`, {
+        method: "DELETE"
+      });
+    }
+  } catch (sbErr) {
+    console.warn("Supabase delete failed:", sbErr);
+  }
+
+  // 2. ลบผ่าน API
   if (GAS_API_URL) {
     try {
       await fetch(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "deleteProduct", id: productId })
       });
     } catch (err) {}

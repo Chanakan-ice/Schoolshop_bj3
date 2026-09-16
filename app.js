@@ -167,6 +167,16 @@ function initEventListeners() {
   window.addEventListener("popstate", handleUrlHash);
 }
 
+function getApiHeaders(customHeaders = {}) {
+  const headers = { ...customHeaders };
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    headers["X-Supabase-Url"] = sbConfig.url;
+    headers["X-Supabase-Key"] = sbConfig.key;
+  }
+  return headers;
+}
+
 // ==================== Fetch Products ====================
 async function loadProducts() {
   const countEl = document.getElementById("productCount");
@@ -179,6 +189,7 @@ async function loadProducts() {
       const data = await supabaseFetch("products?select=*&order=created_at.desc");
       if (Array.isArray(data) && data.length > 0) {
         products = data;
+        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
         renderProducts();
         return;
       }
@@ -190,10 +201,13 @@ async function loadProducts() {
   // 2. ลองดึงผ่าน Vercel Serverless Function API
   if (API_URL) {
     try {
-      const res = await fetch(`${API_URL}?action=getProducts`);
+      const res = await fetch(`${API_URL}?action=getProducts`, {
+        headers: getApiHeaders()
+      });
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         products = json.data;
+        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
         renderProducts();
         return;
       }
@@ -202,17 +216,18 @@ async function loadProducts() {
     }
   }
 
-  // Fallback to local / mock products (ตรวจเช็กและอัปเดตหากเป็นข้อมูลสหกรณ์แบบเดิม)
+  // 3. Fallback to local / mock products
   const localSavedProducts = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
   if (localSavedProducts) {
-    const parsed = JSON.parse(localSavedProducts);
-    // หากพบหมวดหมู่เดิม ให้รีเฟรชเป็นหมวดการงานอาชีพ
-    const hasOldCategories = parsed.some(p => p.category === "สมุด/เครื่องเขียน" || p.category === "ของว่าง/เครื่องดื่ม");
-    if (hasOldCategories) {
+    try {
+      const parsed = JSON.parse(localSavedProducts);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        products = parsed;
+      } else {
+        products = DEFAULT_PRODUCTS;
+      }
+    } catch (e) {
       products = DEFAULT_PRODUCTS;
-      localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
-    } else {
-      products = parsed;
     }
   } else {
     products = DEFAULT_PRODUCTS;
@@ -1319,7 +1334,6 @@ async function handleOrderSubmit(e) {
   } catch (error) {
     console.error("Order error:", error);
     showToast("เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
-  }
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
