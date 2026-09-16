@@ -546,6 +546,8 @@ function updateCustomerUI() {
   if (countEl) countEl.innerText = accounts.length;
   if (savedCountEl) savedCountEl.innerText = accounts.length;
 
+  const bnavLabel = document.getElementById("bnavAccountLabel");
+
   if (current) {
     if (nameEl) nameEl.innerText = current.name || current.email.split("@")[0];
     if (avatarEl) {
@@ -559,6 +561,11 @@ function updateCustomerUI() {
     if (loginBtn) loginBtn.style.display = "none";
     if (logoutBtn) logoutBtn.style.display = "flex";
     if (logoutDiv) logoutDiv.style.display = "block";
+
+    if (bnavLabel) {
+      const shortName = (current.name || current.email.split("@")[0]).trim().split(" ")[0];
+      bnavLabel.innerText = shortName.length > 7 ? shortName.substring(0, 6) + ".." : shortName;
+    }
   } else {
     if (nameEl) nameEl.innerText = "เข้าสู่ระบบ";
     if (avatarEl) avatarEl.innerHTML = '<i class="fa-solid fa-user"></i>';
@@ -566,6 +573,8 @@ function updateCustomerUI() {
     if (loginBtn) loginBtn.style.display = "flex";
     if (logoutBtn) logoutBtn.style.display = "none";
     if (logoutDiv) logoutDiv.style.display = "none";
+
+    if (bnavLabel) bnavLabel.innerText = "บัญชี";
   }
 }
 
@@ -967,10 +976,16 @@ function saveCart() {
 }
 
 function updateCartBadge() {
-  const countEl = document.getElementById("cartCount");
-  if (!countEl) return;
   const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  countEl.innerText = totalCount;
+
+  const countEl = document.getElementById("cartCount");
+  if (countEl) countEl.innerText = totalCount;
+
+  const bnavBadge = document.getElementById("bnavCartBadge");
+  if (bnavBadge) bnavBadge.innerText = totalCount;
+
+  const floatBadge = document.getElementById("floatingCartBadge");
+  if (floatBadge) floatBadge.innerText = totalCount;
 }
 
 function calculateCartTotal() {
@@ -1658,114 +1673,44 @@ function showBuyerView() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function showSellerView() {
-  const buyerView = document.getElementById("buyerView");
-  const sellerView = document.getElementById("sellerView");
-  const mainShopView = document.getElementById("mainShopView");
-  const productDetailView = document.getElementById("productDetailView");
-
-  if (buyerView) buyerView.style.display = "none";
-  if (productDetailView) productDetailView.style.display = "none";
-  if (mainShopView) mainShopView.style.display = "block";
-  if (sellerView) sellerView.style.display = "block";
-
+// ==================== Mobile App Bottom Navigation & Store Helpers ====================
+function goToHomeStore() {
+  closeProductDetail();
   window.scrollTo({ top: 0, behavior: "smooth" });
+  document.querySelectorAll(".bottom-nav-item").forEach(b => b.classList.remove("active"));
+  const homeBtn = document.getElementById("bnavHome");
+  if (homeBtn) homeBtn.classList.add("active");
+}
+window.goToHomeStore = goToHomeStore;
 
-  try {
-    history.pushState({ view: "seller" }, "", "?view=seller");
-  } catch (e) {}
-
-  if (typeof refreshAllData === "function") {
-    refreshAllData();
+function handleBottomNavAccount() {
+  const current = getCurrentCustomer();
+  if (current) {
+    toggleCustomerDropdown();
+  } else {
+    openCustomerAuthModal("login");
   }
 }
+window.handleBottomNavAccount = handleBottomNavAccount;
+
+// ==================== Dedicated Admin Redirection ====================
+// หน้าแดชบอร์ดจัดการร้านค้าแยกเป็นอิสระที่ seller.html (หรือ /seller)
+function showSellerView() {
+  window.location.href = "seller.html";
+}
+window.showSellerView = showSellerView;
 
 function openAdminAuthModal() {
-  const modal = document.getElementById("adminAuthModal");
-  if (!modal) return;
-  modal.classList.add("active");
-  const err = document.getElementById("authErrorMsg");
-  if (err) err.style.display = "none";
-  const input = document.getElementById("adminPasswordInput");
-  if (input) {
-    input.value = "";
-    setTimeout(() => input.focus(), 150);
-  }
+  window.location.href = "seller.html";
 }
 window.openAdminAuthModal = openAdminAuthModal;
 
-function closeAdminAuthModal() {
-  const modal = document.getElementById("adminAuthModal");
-  if (modal) modal.classList.remove("active");
-  const input = document.getElementById("adminPasswordInput");
-  if (input) input.value = "";
-  const err = document.getElementById("authErrorMsg");
-  if (err) err.style.display = "none";
-}
-window.closeAdminAuthModal = closeAdminAuthModal;
-
-function handleAdminLogin(e) {
-  if (e) e.preventDefault();
-  const input = document.getElementById("adminPasswordInput");
-  const err = document.getElementById("authErrorMsg");
-  const card = document.getElementById("adminAuthCard");
-  const enteredPass = (input ? input.value : "").trim();
-  const savedPass = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "").trim();
-
-  // ยอมรับรหัสหลัก admin1234 (ไม่สนตัวพิมพ์เล็กพิมพ์ใหญ่) หรือรหัสที่บันทึกไว้
-  const isMatch = (enteredPass.toLowerCase() === "admin1234") || (savedPass && enteredPass === savedPass);
-
-  if (isMatch) {
-    // รหัสผ่านถูกต้อง -> อนุญาตให้เข้าสู่หน้าแดชบอร์ดแอดมิน
-    sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
-    sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
-    if (err) err.style.display = "none";
-    const modal = document.getElementById("adminAuthModal");
-    if (modal) modal.classList.remove("active");
-    if (input) input.value = "";
-    showSellerView();
-    showToast("เข้าสู่ระบบแดชบอร์ดแอดมินสำเร็จ", "success");
-  } else {
-    // รหัสผ่านไม่ถูกต้อง -> แจ้งเตือน และให้ลองกรอกใหม่ทันที ไม่เตะออกจากหน้า
-    if (err) {
-      err.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กรุณากรอกใหม่อีกครั้ง (ค่าเริ่มต้นคือ <code>admin1234</code>)';
-      err.style.display = "block";
-    }
-    if (card) {
-      card.classList.add("shake-anim");
-      setTimeout(() => card.classList.remove("shake-anim"), 450);
-    }
-    if (input) {
-      input.value = "";
-      input.focus();
-    }
-    showToast("รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง", "error");
-  }
-}
-window.handleAdminLogin = handleAdminLogin;
-
-function logoutAdmin() {
-  sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
-  sessionStorage.removeItem("CAREER_ADMIN_AUTH");
-  showBuyerView();
-  showToast("ออกจากระบบผู้ดูแลเรียบร้อยแล้ว", "info");
-}
-
-// ตรวจสอบสถานะการล็อกอินเมื่อเปิดหน้าเว็บ
+// ตรวจสอบสถานะและลิงก์เมื่อเปิดหน้าเว็บ
 document.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get("view");
 
   if (viewParam === "seller") {
-    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true") {
-      showSellerView();
-    } else {
-      openAdminAuthModal();
-    }
-  } else {
-    if (sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true") {
-      // ผู้ใช้เคยล็อกอินไว้ในเซสชันนี้
-      // สามารถคงอยู่ที่หน้าร้านค้าหรือสลับได้
-    }
+    window.location.href = "seller.html";
   }
 });

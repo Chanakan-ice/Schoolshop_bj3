@@ -87,8 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
     sbKeyInput.value = localStorage.getItem("SUPABASE_ANON_KEY") || "";
   }
 
-  // ตรวจสอบ Auth เฉพาะเมื่อเปิดไฟล์ seller.html โดยตรงเท่านั้น (ไม่เปิดค้างบน index.html)
-  if (window.location.pathname.endsWith("seller.html") || window.location.search.includes("view=seller")) {
+  // ตรวจสอบ Auth เมื่อเปิดหน้า seller (ทั้ง /seller หรือ seller.html)
+  if (window.location.pathname.includes("seller") || window.location.search.includes("view=seller")) {
     checkAdminAuth();
   }
 });
@@ -944,7 +944,7 @@ function closeAdminAuthModal() {
   const err = document.getElementById("authErrorMsg");
   if (err) err.style.display = "none";
 
-  if (window.location.pathname.endsWith("seller.html")) {
+  if (window.location.pathname.includes("seller")) {
     window.location.href = "index.html";
   } else if (typeof showBuyerView === "function") {
     showBuyerView();
