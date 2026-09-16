@@ -5,13 +5,16 @@
  * ==============================================================================
  */
 
-// API Backend Endpoint บน Vercel (/api/shop) แทน Google Apps Script
-var DEFAULT_API_URL = "/api/shop";
+// API Backend Endpoint บน Vercel (/api/shop)
+var LIVE_VERCEL_API = "https://schoolshop-bj3.vercel.app/api/shop";
+var DEFAULT_API_URL = (typeof window !== "undefined" && (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+  ? LIVE_VERCEL_API
+  : "/api/shop";
 var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
-  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_API_URL || "").trim();
-  if (url.includes("script.google.com")) {
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || "").trim();
+  if (!url || url.includes("script.google.com") || ((window.location.protocol === "file:" || window.location.hostname === "localhost") && url.startsWith("/"))) {
     url = DEFAULT_API_URL;
     localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_API_URL);
   }
@@ -1213,8 +1216,8 @@ async function testEmailNotification() {
   const targetUrl = getActiveApiUrl();
   let isDone = false;
 
-  // 1. ลองผ่าน Vercel API (/api/shop)
-  if (targetUrl && window.location.protocol !== "file:") {
+  // 1. ลองผ่าน Vercel API
+  if (targetUrl) {
     try {
       const res = await fetch(targetUrl, {
         method: "POST",
@@ -1225,10 +1228,10 @@ async function testEmailNotification() {
         })
       });
       const json = await res.json();
-      if (json.success) {
+      if (json && json.success) {
         showToast(`✅ ${json.message}`, "success");
         isDone = true;
-      } else if (json.needsActivation) {
+      } else if (json && json.needsActivation) {
         alert("⚠️ ต้องการการยืนยันครั้งแรก:\n\nระบบส่งลิงก์ยืนยันไปที่ " + emails + " แล้ว\nกรุณาเปิดอีเมลแล้วกดปุ่ม 'Activate Form' เพียง 1 ครั้งเพื่อเริ่มต้นรับการแจ้งเตือนครับ");
         showToast("⚠️ กรุณากด Activate Form ในอีเมลของคุณครู", "warning");
         isDone = true;

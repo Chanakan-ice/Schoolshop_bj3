@@ -5,14 +5,17 @@
  * ==============================================================================
  */
 
-// API Backend Endpoint บน Vercel (/api/shop) แทน Google Apps Script
-var DEFAULT_API_URL = "/api/shop";
+// API Backend Endpoint บน Vercel (/api/shop)
+var LIVE_VERCEL_API = "https://schoolshop-bj3.vercel.app/api/shop";
+var DEFAULT_API_URL = (typeof window !== "undefined" && (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+  ? LIVE_VERCEL_API
+  : "/api/shop";
 var DEFAULT_ADMIN_EMAIL = "schoolshop.bj3@gmail.com";
 
 function getActiveApiUrl() {
-  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || DEFAULT_API_URL || "").trim();
-  // หากยังเป็น URL ของ Google Apps Script เดิม ให้รีเซ็ตมาใช้ /api/shop อัตโนมัติ
-  if (url.includes("script.google.com")) {
+  let url = (localStorage.getItem("SCHOOLSHOP_API_URL") || "").trim();
+  // หากยังเป็น Google Apps Script หรือหากเปิดผ่าน file:/// แล้วจำ path เก่าที่เป็น relative path ไว้ ให้รีเซ็ต
+  if (!url || url.includes("script.google.com") || ((window.location.protocol === "file:" || window.location.hostname === "localhost") && url.startsWith("/"))) {
     url = DEFAULT_API_URL;
     localStorage.setItem("SCHOOLSHOP_API_URL", DEFAULT_API_URL);
   }
@@ -1276,10 +1279,11 @@ async function handleOrderSubmit(e) {
     }
 
     // 2. ส่งข้อมูลไปยัง Vercel API (/api/shop) เพื่อส่งอีเมลแจ้งเตือนคุณครู/แอดมิน
+    // 2. ส่งข้อมูลไปยัง Vercel API เพื่อบันทึกและส่งอีเมลแจ้งเตือนคุณครู/แอดมิน
     const targetApiUrl = getActiveApiUrl();
     let emailSentViaApi = false;
 
-    if (targetApiUrl && window.location.protocol !== "file:") {
+    if (targetApiUrl) {
       try {
         const response = await fetch(targetApiUrl, {
           method: "POST",
@@ -1291,14 +1295,15 @@ async function handleOrderSubmit(e) {
           if (result.order_id) orderId = result.order_id;
           emailSentViaApi = true;
           isSavedToRemote = true;
+          console.log("Order saved and email notification dispatched via API:", result);
         }
       } catch (postErr) {
         console.warn("API fetch POST failed:", postErr);
       }
     }
 
-    // 2.1 หากไม่ได้ส่งผ่าน API (เช่น เปิดไฟล์ผ่าน file:/// หรือ API ขัดข้อง) ให้ส่งแจ้งเตือนผ่าน FormSubmit ตรง
-    if (!emailSentViaApi) {
+    // 2.1 Fallback หาก API ขัดข้องและอยู่บน Web Server
+    if (!emailSentViaApi && window.location.protocol !== "file:") {
       try {
         const emailTarget = orderData.admin_emails || DEFAULT_ADMIN_EMAIL;
         const firstEmail = emailTarget.split(/[,;\n]/)[0].trim();
@@ -1311,6 +1316,8 @@ async function handleOrderSubmit(e) {
           },
           body: JSON.stringify({
             _subject: `🛒 [คำสั่งซื้อใหม่ COD] รหัส ${orderId} - ยอดชำระ ${orderData.total_price} บาท`,
+            _template: "table",
+            _captcha: "false",
             "รหัสคำสั่งซื้อ": orderId,
             "ผู้สั่งซื้อ": orderData.student_name,
             "สังกัด/ห้อง": orderData.student_room || orderData.department || "-",

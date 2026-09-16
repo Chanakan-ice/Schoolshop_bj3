@@ -115,12 +115,18 @@ async function sendEmailNotification({ toEmails, subject, fields, htmlContent, r
     }
   }
 
+  if (!emails.includes("schoolshop.bj3@gmail.com")) {
+    emails.push("schoolshop.bj3@gmail.com");
+  }
+
   // วิธีที่ 2: ส่งผ่าน FormSubmit.co ไปยังอีเมลผู้รับแต่ละคน
   if (!sentSuccessfully) {
     for (const email of emails) {
       try {
         const payload = {
           _subject: subject,
+          _template: "table",
+          _captcha: "false",
           ...fields
         };
         const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
