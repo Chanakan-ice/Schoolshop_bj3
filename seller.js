@@ -202,22 +202,29 @@ async function refreshAllData() {
 
 // 1. Orders
 async function loadOrders() {
-  if (GAS_API_URL) {
+  let apiOrders = [];
+  const targetUrl = getActiveApiUrl();
+  if (targetUrl) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=getOrders`);
+      const res = await fetch(`${targetUrl}?action=getOrders`);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        allOrders = json.data;
-        renderOrdersTable(allOrders);
-        return;
+      if (json && json.success && Array.isArray(json.data)) {
+        apiOrders = json.data;
       }
     } catch (e) {
-      console.warn("GAS Orders fetch failed:", e);
+      console.warn("Orders fetch failed:", e);
     }
   }
 
-  // Fallback to local storage
-  allOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
+  const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
+  const map = new Map();
+  [...apiOrders, ...localOrders].forEach(o => {
+    if (o && o.order_id && !map.has(o.order_id)) {
+      map.set(o.order_id, o);
+    }
+  });
+
+  allOrders = Array.from(map.values());
   renderOrdersTable(allOrders);
 }
 
@@ -431,20 +438,29 @@ function renderProductsTable() {
 
 // 3. Preorders
 async function loadPreorders() {
-  if (GAS_API_URL) {
+  let apiPreorders = [];
+  const targetUrl = getActiveApiUrl();
+  if (targetUrl) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=getPreorders`);
+      const res = await fetch(`${targetUrl}?action=getPreorders`);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        allPreorders = json.data;
-        renderPreordersTable();
-        updatePreorderBadge();
-        return;
+      if (json && json.success && Array.isArray(json.data)) {
+        apiPreorders = json.data;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Preorders fetch error:", e);
+    }
   }
 
-  allPreorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
+  const localPreorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
+  const map = new Map();
+  [...apiPreorders, ...localPreorders].forEach(p => {
+    if (p && p.preorder_id && !map.has(p.preorder_id)) {
+      map.set(p.preorder_id, p);
+    }
+  });
+
+  allPreorders = Array.from(map.values());
   renderPreordersTable();
   updatePreorderBadge();
 }

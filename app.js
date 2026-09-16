@@ -270,6 +270,11 @@ function renderProducts() {
     return;
   }
 
+  const datalist = document.getElementById("shopProductsList");
+  if (datalist && Array.isArray(products) && products.length > 0) {
+    datalist.innerHTML = products.map(p => `<option value="${p.name}"></option>`).join("");
+  }
+
   grid.innerHTML = filtered.map(item => {
     const stock = Number(item.stock) || 0;
     const isOutOfStock = stock <= 0;
@@ -293,16 +298,20 @@ function renderProducts() {
               </div>
             </div>
             
-            ${isOutOfStock ? `
-              <button class="add-cart-btn preorder-card-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
-                <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
-              </button>
-            ` : `
-              <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${item.id}')">
-                <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
-              </button>
-            `}
-          </div>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              ${isOutOfStock ? `
+                <button class="add-cart-btn preorder-card-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
+                  <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
+                </button>
+              ` : `
+                <button class="card-preorder-icon-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')" title="สั่งจองล่วงหน้ารายการนี้">
+                  <i class="fa-solid fa-calendar-plus"></i> จอง
+                </button>
+                <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${item.id}')">
+                  <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
+                </button>
+              `}
+            </div>
         </div>
       </div>
     `;
@@ -399,6 +408,11 @@ function viewProductDetail(productId, pushHistory = true) {
             </button>
             <button type="button" class="btn-add-cart-detail" onclick="addCurrentProductToCart('${prod.id}')">
               <i class="fa-solid fa-cart-plus"></i> เพิ่มลงตะกร้า
+            </button>
+          </div>
+          <div style="margin-top: 0.85rem;">
+            <button type="button" onclick="openPreorderForProduct('${encodeURIComponent(prod.name)}')" style="background: #fffbeb; border: 1px solid #fde68a; color: #b45309; padding: 0.6rem 1rem; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; transition: var(--transition);">
+              <i class="fa-solid fa-calendar-plus"></i> ต้องการสั่งจองสินค้ารายการนี้ล่วงหน้า (Pre-order)
             </button>
           </div>
         ` : `
@@ -1604,28 +1618,54 @@ async function handlePreorderSubmit(e) {
   };
 
   let preId = "PRE-" + Date.now().toString().slice(-6);
-  const targetGasUrl = getActiveApiUrl();
+  const targetApiUrl = getActiveApiUrl();
+  let preorderSentViaApi = false;
 
-  if (targetGasUrl) {
+  if (targetApiUrl) {
     try {
-      const response = await fetch(targetGasUrl, {
+      const response = await fetch(targetApiUrl, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(data)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, preorder_id: preId })
       });
       const resJson = await response.json();
-      if (resJson.success && resJson.preorder_id) {
-        preId = resJson.preorder_id;
+      if (resJson && resJson.success) {
+        if (resJson.preorder_id) preId = resJson.preorder_id;
+        preorderSentViaApi = true;
+        console.log("Preorder saved and email dispatched via API:", resJson);
       }
     } catch (err) {
-      console.warn("GAS Preorder error (trying no-cors fallback):", err);
-      fetch(targetGasUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(data)
-      }).catch(e => console.warn("no-cors preorder err:", e));
+      console.warn("Preorder API POST error:", err);
     }
+  }
+
+  // Fallback direct FormSubmit หากจำเป็นและอยู่บน Web Server
+  if (!preorderSentViaApi && window.location.protocol !== "file:") {
+    try {
+      const emailTarget = data.admin_emails || DEFAULT_ADMIN_EMAIL;
+      const firstEmail = emailTarget.split(/[,;\n\s]+/)[0].trim();
+      fetch(`https://formsubmit.co/ajax/${encodeURIComponent(firstEmail)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          _subject: `🔔 [รายการสั่งจองใหม่] รหัส ${preId} - ${data.product_name} (${data.quantity} ชิ้น)`,
+          _template: "table",
+          _captcha: "false",
+          "ประเภทรายการ": "รายการสั่งจองสินค้าล่วงหน้า (Pre-order)",
+          "รหัสการสั่งจอง": preId,
+          "ผู้สั่งจอง": `${data.student_name} (${data.buyer_type})`,
+          "เบอร์โทรติดต่อ": data.phone,
+          "สินค้าที่สั่งจอง": data.product_name,
+          "จำนวนที่จอง": `${data.quantity} ชิ้น`,
+          "ช่องทางแจ้งเตือน": `${data.notify_channel}: ${data.notify_account}`,
+          "จุดนัดรับ": data.pickup_location || "หมวดการงานอาชีพ",
+          "หมายเหตุ": data.note || "ไม่มี"
+        })
+      }).catch(e => console.warn("Fallback direct preorder email failed:", e));
+    } catch (e) {}
   }
 
   // เก็บ LocalStorage

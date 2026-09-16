@@ -116,34 +116,61 @@ async function sendEmailNotification({ toEmails, subject, fields, htmlContent, r
   }
 
   if (!emails.includes("schoolshop.bj3@gmail.com")) {
-    emails.push("schoolshop.bj3@gmail.com");
+    emails.unshift("schoolshop.bj3@gmail.com");
   }
+  emails = [...new Set(emails)];
 
-  // วิธีที่ 2: ส่งผ่าน FormSubmit.co ไปยังอีเมลผู้รับแต่ละคน
+  // วิธีที่ 2: ส่งผ่าน FormSubmit.co ไปยังทุกอีเมล (รองรับหลายอีเมลด้วย _cc และส่งตรง)
   if (!sentSuccessfully) {
-    for (const email of emails) {
-      try {
-        const payload = {
-          _subject: subject,
-          _template: "table",
-          _captcha: "false",
-          ...fields
-        };
-        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Referer": "https://schoolshop.vercel.app/",
-            "Origin": "https://schoolshop.vercel.app"
-          },
-          body: JSON.stringify(payload)
-        });
-        const result = await response.json();
-        console.log(`FormSubmit delivery to ${email}:`, result);
-        sentSuccessfully = true;
-      } catch (err) {
-        console.warn(`FormSubmit delivery to ${email} error:`, err.message);
+    const primaryEmail = emails[0];
+    const ccEmails = emails.slice(1);
+
+    try {
+      const primaryPayload = {
+        _subject: subject,
+        _template: "table",
+        _captcha: "false",
+        ...(ccEmails.length > 0 ? { _cc: ccEmails.join(",") } : {}),
+        ...fields
+      };
+      const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(primaryEmail)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Referer": "https://schoolshop.vercel.app/",
+          "Origin": "https://schoolshop.vercel.app"
+        },
+        body: JSON.stringify(primaryPayload)
+      });
+      const result = await response.json();
+      console.log(`FormSubmit primary delivery to ${primaryEmail} (CC: ${ccEmails.join(",")}):`, result);
+      sentSuccessfully = true;
+    } catch (err) {
+      console.warn(`FormSubmit primary delivery error:`, err.message);
+    }
+
+    // ส่งสำเนาตรงไปยังอีเมลคุณครูท่านอื่นๆ เพื่อความแน่นอน 100%
+    if (ccEmails.length > 0) {
+      for (const email of ccEmails) {
+        try {
+          const directPayload = {
+            _subject: subject,
+            _template: "table",
+            _captcha: "false",
+            ...fields
+          };
+          fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Referer": "https://schoolshop.vercel.app/",
+              "Origin": "https://schoolshop.vercel.app"
+            },
+            body: JSON.stringify(directPayload)
+          }).catch(e => console.warn(`FormSubmit copy to ${email} error:`, e));
+        } catch (e) {}
       }
     }
   }
@@ -325,12 +352,13 @@ export default async function handler(req, res) {
         const emails = body.emails || req.query.emails || "schoolshop.bj3@gmail.com";
         await sendEmailNotification({
           toEmails: emails,
-          subject: "🧪 [ทดสอบ] ระบบแจ้งเตือนอีเมลร้านค้า CareerShop บน Vercel",
+          subject: "🧪 [ทดสอบระบบ] ทดสอบการแจ้งเตือนร้านค้าหมวดการงานอาชีพ (ภาษาไทย)",
           fields: {
-            "หัวข้อ": "ทดสอบส่งอีเมลแจ้งเตือนร้านค้า",
-            "ผู้รับ": emails,
-            "เวลาที่ส่ง": new Date().toLocaleString("th-TH"),
-            "ข้อความ": "ระบบแจ้งเตือนทางอีเมลของร้านค้าหมวดการงานอาชีพพร้อมใช้งานแล้ว เมื่อมีคำสั่งซื้อหรือสั่งจองใหม่ อีเมลจะถูกส่งมาที่นี่อัตโนมัติ"
+            "ประเภทการแจ้งเตือน": "ทดสอบระบบส่งอีเมลแจ้งเตือน",
+            "สถานะการทำงาน": "พร้อมใช้งาน 100%",
+            "รายชื่ออีเมลผู้รับ": typeof emails === "string" ? emails : emails.join(", "),
+            "วันที่และเวลา": new Date().toLocaleString("th-TH"),
+            "ข้อความ": "ระบบแจ้งเตือนทางอีเมลของร้านค้าหมวดการงานอาชีพพร้อมใช้งานแล้ว เมื่อมีคำสั่งซื้อใหม่ (COD) หรือรายการสั่งจองใหม่ (Pre-order) ข้อมูลภาษาไทยจะถูกส่งมายังทุกอีเมลที่ตั้งค่าไว้อัตโนมัติ"
           },
           resendKey: RESEND_KEY || body.resend_key
         });
@@ -405,22 +433,23 @@ export default async function handler(req, res) {
         // ส่งอีเมลแจ้งเตือนคุณครู / แอดมินทันที
         const targetEmails = body.admin_emails || "schoolshop.bj3@gmail.com";
         const isTeacherBuyer = body.department && body.department !== "-";
-        const buyerRoleStr = isTeacherBuyer ? `คุณครู (${body.department})` : `นักเรียน (${body.student_class}/${body.student_room} เลขที่ ${body.student_no})`;
+        const buyerRoleStr = isTeacherBuyer ? `คุณครู (${body.department})` : `นักเรียน (${body.student_class || 'นักเรียน'}/${body.student_room || '-'} เลขที่ ${body.student_no || '-'})`;
 
         try {
           await sendEmailNotification({
             toEmails: targetEmails,
             subject: `🛒 [คำสั่งซื้อใหม่ COD] รหัส ${orderId} - ยอดชำระ ${orderRecord.total_price} บาท`,
             fields: {
+              "ประเภทรายการ": "คำสั่งซื้อใหม่ (เก็บเงินปลายทาง COD)",
               "รหัสคำสั่งซื้อ": orderId,
-              "วันที่สั่งซื้อ": orderRecord.timestamp,
+              "วันที่และเวลา": orderRecord.timestamp,
               "ผู้สั่งซื้อ": `${orderRecord.student_name} (${buyerRoleStr})`,
               "เบอร์โทรติดต่อ": orderRecord.phone,
               "สถานที่นัดรับสินค้า": orderRecord.pickup_location,
-              "รายการสินค้า": itemsText,
-              "ยอดเงินที่ต้องชำระ (COD)": `${orderRecord.total_price} บาท`,
-              "วิธีชำระเงิน": "ชำระเงินปลายทาง (COD) เมื่อรับของ",
-              "หมายเหตุ": orderRecord.note || "-"
+              "รายการสินค้าที่สั่ง": itemsText,
+              "ยอดรวมที่ต้องชำระ": `${orderRecord.total_price} บาท (COD)`,
+              "วิธีการชำระเงิน": "ชำระเงินสดปลายทางเมื่อรับสินค้า",
+              "หมายเหตุเพิ่มเติม": orderRecord.note || "ไม่มี"
             },
             resendKey: RESEND_KEY || body.resend_key
           });
@@ -449,11 +478,13 @@ export default async function handler(req, res) {
 
       // 3. สั่งจองล่วงหน้า (Create Pre-order)
       if (postAction === "createPreorder") {
-        const preorderId = "PRE-" + Date.now().toString().slice(-6);
+        const preorderId = body.preorder_id || ("PRE-" + Date.now().toString().slice(-6));
         const preRecord = {
           preorder_id: preorderId,
           timestamp: new Date().toLocaleString("th-TH"),
           student_name: body.student_name || "ไม่ระบุชื่อ",
+          buyer_type: body.buyer_type || "นักเรียน",
+          department: body.department || "-",
           student_class: body.student_class || "-",
           student_room: body.student_room || "-",
           student_no: body.student_no || "-",
@@ -462,6 +493,7 @@ export default async function handler(req, res) {
           notify_account: body.notify_account || "-",
           product_name: body.product_name || "-",
           quantity: Number(body.quantity) || 1,
+          pickup_location: body.pickup_location || "หมวดการงานอาชีพ",
           delivery_date: body.delivery_date || "รอคุณครูกำหนดวัน",
           status: "รอดำเนินการ",
           note: body.note || ""
@@ -480,19 +512,26 @@ export default async function handler(req, res) {
 
         // ส่งอีเมลแจ้งเตือนการจองสินค้า
         const targetEmails = body.admin_emails || "schoolshop.bj3@gmail.com";
+        const isTeacherPre = body.buyer_type === "คุณครู" || (body.department && body.department !== "-");
+        const buyerRolePre = isTeacherPre ? `คุณครู (${body.department || 'หมวดการงานฯ'})` : `นักเรียน (${body.student_class || 'นักเรียน'}/${body.student_room || '-'} เลขที่ ${body.student_no || '-'})`;
+
         try {
           await sendEmailNotification({
             toEmails: targetEmails,
             subject: `🔔 [รายการสั่งจองใหม่] รหัส ${preorderId} - ${preRecord.product_name} (${preRecord.quantity} ชิ้น)`,
             fields: {
-              "รหัสการจอง": preorderId,
-              "วันที่บันทึก": preRecord.timestamp,
-              "ผู้สั่งจอง": `${preRecord.student_name} (${preRecord.student_class}/${preRecord.student_room})`,
+              "ประเภทรายการ": "รายการสั่งจองสินค้าล่วงหน้า (Pre-order)",
+              "รหัสการสั่งจอง": preorderId,
+              "วันที่และเวลาที่จอง": preRecord.timestamp,
+              "ผู้สั่งจอง": `${preRecord.student_name} (${buyerRolePre})`,
               "เบอร์โทรติดต่อ": preRecord.phone,
-              "สินค้าที่จอง": `${preRecord.product_name} (จำนวน ${preRecord.quantity} ชิ้น)`,
-              "วันที่ต้องการรับ": preRecord.delivery_date,
-              "ช่องทางแจ้งเตือนผู้ซื้อ": `${preRecord.notify_channel}: ${preRecord.notify_account}`,
-              "หมายเหตุ": preRecord.note || "-"
+              "สินค้าที่สั่งจอง": preRecord.product_name,
+              "จำนวนที่จอง": `${preRecord.quantity} ชิ้น`,
+              "วันที่ต้องการรับของ": preRecord.delivery_date,
+              "ช่องทางแจ้งเตือนผู้จอง": `${preRecord.notify_channel}: ${preRecord.notify_account}`,
+              "จุดนัดรับสินค้า": preRecord.pickup_location || "หมวดการงานอาชีพ",
+              "หมายเหตุเพิ่มเติม": preRecord.note || "ไม่มี",
+              "ระยะเวลารอคอย": "การสั่งจองสินค้าต้องรอจัดเตรียมอย่างน้อย 2 - 3 วัน หรือตามกำหนดของครูผู้ขาย"
             },
             resendKey: RESEND_KEY || body.resend_key
           });

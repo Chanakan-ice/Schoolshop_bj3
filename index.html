@@ -388,7 +388,15 @@
         <form id="preorderForm" onsubmit="handlePreorderSubmit(event)">
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-box"></i> ชื่อสินค้าที่ต้องการสั่งจอง *</label>
-            <input type="text" id="preProdName" class="form-input" placeholder="เช่น คุกกี้เนยสด, ผักสลัดไฮโดรโปนิกส์" required>
+            <input type="text" id="preProdName" list="shopProductsList" class="form-input" placeholder="คลิกเพื่อเลือกสินค้า หรือพิมพ์ชื่อสินค้าที่ต้องการ..." required>
+            <datalist id="shopProductsList">
+              <option value="คุกกี้เนยสด ช็อกโกแลตชิพ (35฿)"></option>
+              <option value="ผักสลัดไฮโดรโปนิกส์ ปลอดสารเคมี (30฿)"></option>
+              <option value="กระเป๋าผ้ารักษ์โลก ลายเพ้นท์แฮนด์เมด (79฿)"></option>
+              <option value="น้ำอัญชันมะนาว สดชื่น (ขวด 250ml) (15฿)"></option>
+              <option value="ที่รองแก้วไม้สัก ฉลุลายประดิษฐ์ (45฿)"></option>
+              <option value="ชุดอุปกรณ์ตัดเย็บเบื้องต้น (พกพา) (55฿)"></option>
+            </datalist>
           </div>
 
           <div class="form-group">

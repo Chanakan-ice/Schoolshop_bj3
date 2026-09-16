@@ -460,6 +460,29 @@ body {
   box-shadow: 0 5px 12px rgba(217, 119, 6, 0.4);
 }
 
+.card-preorder-icon-btn {
+  background-color: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.card-preorder-icon-btn:hover {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
 /* ==================== Modals ==================== */
 .modal-overlay {
   position: fixed;
