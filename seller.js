@@ -1208,75 +1208,70 @@ async function testEmailNotification() {
 
   // บันทึกลงเครื่องทันที
   localStorage.setItem("SCHOOLSHOP_ADMIN_EMAILS", emails);
-
   showToast("กำลังส่งอีเมลทดสอบ...", "info");
 
   const targetUrl = getActiveApiUrl();
-  if (!targetUrl) {
-    showToast("กรุณาระบุ Google Apps Script Web App URL ก่อนทดสอบครับ", "error");
-    return;
-  }
+  let isDone = false;
 
-  // วิธีที่ 1: ส่งผ่าน POST ปกติ
-  try {
-    const res = await fetch(targetUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "testEmail",
-        emails: emails
-      })
-    });
-    const json = await res.json();
-    if (json.success) {
-      showToast(`✅ ${json.message}`, "success");
-      return;
-    } else {
-      showToast(`⚠️ ${json.message || 'ส่งอีเมลทดสอบล้มเหลว'}`, "error");
-      return;
+  // 1. ลองผ่าน Vercel API (/api/shop)
+  if (targetUrl && window.location.protocol !== "file:") {
+    try {
+      const res = await fetch(targetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "testEmail",
+          emails: emails
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(`✅ ${json.message}`, "success");
+        isDone = true;
+      } else if (json.needsActivation) {
+        alert("⚠️ ต้องการการยืนยันครั้งแรก:\n\nระบบส่งลิงก์ยืนยันไปที่ " + emails + " แล้ว\nกรุณาเปิดอีเมลแล้วกดปุ่ม 'Activate Form' เพียง 1 ครั้งเพื่อเริ่มต้นรับการแจ้งเตือนครับ");
+        showToast("⚠️ กรุณากด Activate Form ในอีเมลของคุณครู", "warning");
+        isDone = true;
+      }
+    } catch (e) {
+      console.warn("Vercel API testEmail failed, falling back to direct FormSubmit:", e);
     }
-  } catch (postErr) {
-    console.warn("POST fetch error (อาจเกิดจาก CORS หรือเปิดไฟล์จาก file:///):", postErr);
   }
 
-  // วิธีที่ 2: ลองส่งผ่าน GET request (เบราว์เซอร์อนุญาต simple GET แม้เปิดจาก file:///)
-  try {
-    const getUrl = `${targetUrl}?action=testEmail&emails=${encodeURIComponent(emails)}`;
-    const res = await fetch(getUrl);
-    const json = await res.json();
-    if (json.success) {
-      showToast(`✅ ${json.message}`, "success");
-      return;
-    } else if (json.message && json.message !== "Invalid action") {
-      showToast(`⚠️ ${json.message}`, "error");
-      return;
+  // 2. Direct FormSubmit (ใช้ได้ทันทีทั้งบน Vercel และ Local file:///)
+  if (!isDone) {
+    try {
+      const firstEmail = emails.split(/[,;\n]/)[0].trim();
+      const fsRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(firstEmail)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          _subject: "🔔 [ทดสอบระบบ] ระบบแจ้งเตือน School Shop BJ3",
+          "สถานะ": "ระบบแจ้งเตือนทางอีเมลพร้อมใช้งาน!",
+          "วันที่ทดสอบ": new Date().toLocaleString("th-TH"),
+          "อีเมลผู้รับ": emails,
+          "ข้อความ": "หากคุณครูได้รับอีเมลนี้ แสดงว่าระบบพร้อมส่งการแจ้งเตือนทุกครั้งที่มีคำสั่งซื้อเข้ามาแล้วครับ"
+        })
+      });
+      const fsData = await fsRes.json();
+      if (fsData.success === "true" || fsData.success === true) {
+        showToast(`✅ ส่งอีเมลทดสอบไปยัง ${firstEmail} สำเร็จเรียบร้อย!`, "success");
+      } else if (fsData.message && fsData.message.includes("Activation")) {
+        alert(`⚠️ กรุณายืนยันการรับอีเมลครั้งแรก:\n\nระบบได้ส่งอีเมลยืนยันไปที่ ${firstEmail} แล้ว!\nกรุณาเปิดกล่องจดหมายของคุณครู แล้วกดปุ่ม "Activate Form" เพียง 1 ครั้ง\n\nหลังจากกดแล้ว ระบบจะส่งแจ้งเตือนทุกออเดอร์เข้าอีเมลนี้โดยอัตโนมัติครับ!`);
+        showToast("⚠️ กรุณากด Activate Form ในอีเมลของคุณครู", "warning");
+      } else {
+        showToast(`✅ ส่งคำขอแจ้งเตือนแล้ว กรุณาเช็กอีเมล ${firstEmail}`, "info");
+      }
+    } catch (fsErr) {
+      console.warn("Direct FormSubmit failed:", fsErr);
+      showToast("❌ ส่งอีเมลทดสอบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต", "error");
     }
-  } catch (getErr) {
-    console.warn("GET fetch error:", getErr);
   }
-
-  // วิธีที่ 3: ส่งแบบ mode: 'no-cors' POST (เบราว์เซอร์จะไม่บล็อก CORS คำขอจะถูกส่งไปรัน MailApp บน Google Apps Script ทันที)
-  try {
-    await fetch(targetUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        action: "testEmail",
-        emails: emails
-      })
-    });
-    showToast(`📧 ส่งคำขอทดสอบไปยัง Google Apps Script แล้ว! กรุณาตรวจสอบกล่องจดหมาย (${emails})`, "success");
-    return;
-  } catch (noCorsErr) {
-    console.warn("no-cors fetch failed:", noCorsErr);
-  }
-
-  // วิธีที่ 4: หากเบราว์เซอร์บล็อกทั้งหมด ให้เปิดแท็บใหม่เพื่อรันสคริปต์ตรง
-  const directUrl = `${targetUrl}?action=testEmail&emails=${encodeURIComponent(emails)}`;
-  showToast("กำลังเปิดหน้าต่างส่งอีเมลทดสอบโดยตรง...", "info");
-  window.open(directUrl, "_blank");
 }
+
 
 function saveLineMessagingSettings() {
   const token = document.getElementById("lineChannelAccessTokenInput") ? document.getElementById("lineChannelAccessTokenInput").value.trim() : "";

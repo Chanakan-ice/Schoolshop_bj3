@@ -1275,22 +1275,54 @@ async function handleOrderSubmit(e) {
       }
     }
 
-    // 2. ลองส่งไปยัง Vercel API (/api/shop)
+    // 2. ส่งข้อมูลไปยัง Vercel API (/api/shop) เพื่อส่งอีเมลแจ้งเตือนคุณครู/แอดมิน
     const targetApiUrl = getActiveApiUrl();
-    if (!isSavedToRemote && targetApiUrl) {
+    let emailSentViaApi = false;
+
+    if (targetApiUrl && window.location.protocol !== "file:") {
       try {
         const response = await fetch(targetApiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(orderData)
+          body: JSON.stringify({ ...orderData, order_id: orderId })
         });
         const result = await response.json();
-        if (result.success && result.order_id) {
-          orderId = result.order_id;
+        if (result && result.success) {
+          if (result.order_id) orderId = result.order_id;
+          emailSentViaApi = true;
           isSavedToRemote = true;
         }
       } catch (postErr) {
         console.warn("API fetch POST failed:", postErr);
+      }
+    }
+
+    // 2.1 หากไม่ได้ส่งผ่าน API (เช่น เปิดไฟล์ผ่าน file:/// หรือ API ขัดข้อง) ให้ส่งแจ้งเตือนผ่าน FormSubmit ตรง
+    if (!emailSentViaApi) {
+      try {
+        const emailTarget = orderData.admin_emails || DEFAULT_ADMIN_EMAIL;
+        const firstEmail = emailTarget.split(/[,;\n]/)[0].trim();
+        const itemsSummary = (orderData.items || []).map(i => `${i.name} (x${i.quantity})`).join(", ");
+        fetch(`https://formsubmit.co/ajax/${encodeURIComponent(firstEmail)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            _subject: `🛒 [คำสั่งซื้อใหม่ COD] รหัส ${orderId} - ยอดชำระ ${orderData.total_price} บาท`,
+            "รหัสคำสั่งซื้อ": orderId,
+            "ผู้สั่งซื้อ": orderData.student_name,
+            "สังกัด/ห้อง": orderData.student_room || orderData.department || "-",
+            "เบอร์โทรติดต่อ": orderData.phone,
+            "สถานที่นัดรับ": orderData.pickup_location,
+            "ยอดเงินที่ต้องชำระ (COD)": `${orderData.total_price} บาท`,
+            "รายการสินค้า": itemsSummary,
+            "หมายเหตุ": orderData.note || "-"
+          })
+        }).catch(err => console.warn("Fallback direct email send failed:", err));
+      } catch (fsErr) {
+        console.warn("Direct FormSubmit trigger error:", fsErr);
       }
     }
 
