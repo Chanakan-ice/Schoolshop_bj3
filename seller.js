@@ -26,6 +26,40 @@ var GAS_API_URL = API_URL;
 window.API_URL = API_URL;
 window.GAS_API_URL = API_URL;
 
+// Helper: Fetch พร้อมระบบตัดเวลาอัตโนมัติ (Timeout Guard ป้องกันหน้าค้าง)
+async function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
+// Token & Security Headers สำหรับติดต่อ Seller API
+function getSellerToken() {
+  return sessionStorage.getItem("SELLER_AUTH_TOKEN") || "";
+}
+
+function getSellerHeaders(custom = {}) {
+  const token = getSellerToken();
+  const headers = { ...custom };
+  if (token) {
+    headers["X-Seller-Token"] = token;
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    headers["X-Supabase-Url"] = sbConfig.url;
+    headers["X-Supabase-Key"] = sbConfig.key;
+  }
+  return headers;
+}
+
 // Supabase Direct Client Helper
 function getSupabaseConfig() {
   const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
@@ -206,13 +240,22 @@ async function loadOrders() {
   const targetUrl = getActiveApiUrl();
   if (targetUrl) {
     try {
-      const res = await fetch(`${targetUrl}?action=getOrders`);
+      const res = await fetchWithTimeout(`${targetUrl}?action=getOrders`, {
+        headers: getSellerHeaders()
+      }, 6000);
+      if (res.status === 401) {
+        sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+        sessionStorage.removeItem("SELLER_AUTH_TOKEN");
+        openAdminAuthModal();
+        showToast("เซสชันหมดอายุ กรุณาเข้าสู่ระบบผู้ดูแลอีกครั้ง", "warning");
+        return;
+      }
       const json = await res.json();
       if (json && json.success && Array.isArray(json.data)) {
         apiOrders = json.data;
       }
     } catch (e) {
-      console.warn("Orders fetch failed:", e);
+      console.warn("Orders fetch failed/timeout:", e);
     }
   }
 
@@ -319,15 +362,15 @@ async function changeOrderStatus(orderId, newStatus) {
 
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           action: "updateOrderStatus",
           order_id: orderId,
           status: newStatus
         })
-      });
+      }, 6000);
     } catch (e) {
       console.warn("GAS order status update error:", e);
     }
@@ -363,10 +406,12 @@ async function loadSellerProducts() {
     }
   }
 
-  // 2. ลองดึงผ่าน API
+  // 2. ลองดึงผ่าน API พร้อม Timeout Guard
   if (GAS_API_URL) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=getProducts`);
+      const res = await fetchWithTimeout(`${GAS_API_URL}?action=getProducts`, {
+        headers: getSellerHeaders()
+      }, 6000);
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         allProducts = json.data;
@@ -375,7 +420,7 @@ async function loadSellerProducts() {
         return;
       }
     } catch (e) {
-      console.warn("API Products fetch failed:", e);
+      console.warn("API Products fetch failed/timeout:", e);
     }
   }
 
@@ -442,13 +487,21 @@ async function loadPreorders() {
   const targetUrl = getActiveApiUrl();
   if (targetUrl) {
     try {
-      const res = await fetch(`${targetUrl}?action=getPreorders`);
+      const res = await fetchWithTimeout(`${targetUrl}?action=getPreorders`, {
+        headers: getSellerHeaders()
+      }, 6000);
+      if (res.status === 401) {
+        sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+        sessionStorage.removeItem("SELLER_AUTH_TOKEN");
+        openAdminAuthModal();
+        return;
+      }
       const json = await res.json();
       if (json && json.success && Array.isArray(json.data)) {
         apiPreorders = json.data;
       }
     } catch (e) {
-      console.warn("Preorders fetch error:", e);
+      console.warn("Preorders fetch error/timeout:", e);
     }
   }
 
@@ -574,16 +627,16 @@ async function saveDeliveryDate(preorderId, dateVal) {
 
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           action: "setPreorderDeliveryDate",
           preorder_id: preorderId,
           delivery_date: dateVal,
           status: newStatus
         })
-      });
+      }, 6000);
     } catch (e) {
       console.warn("GAS date save error:", e);
     }
@@ -604,11 +657,11 @@ async function saveDeliveryDate(preorderId, dateVal) {
 async function changePreorderStatus(preorderId, newStatus) {
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ action: "updatePreorderStatus", preorder_id: preorderId, status: newStatus })
-      });
+      }, 6000);
     } catch (e) {}
   }
 
@@ -626,14 +679,24 @@ async function changePreorderStatus(preorderId, newStatus) {
 async function loadMessages() {
   if (GAS_API_URL) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=getMessages`);
+      const res = await fetchWithTimeout(`${GAS_API_URL}?action=getMessages`, {
+        headers: getSellerHeaders()
+      }, 6000);
+      if (res.status === 401) {
+        sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+        sessionStorage.removeItem("SELLER_AUTH_TOKEN");
+        openAdminAuthModal();
+        return;
+      }
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         allMessages = json.data;
         renderMessagesTable();
         return;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Messages fetch error/timeout:", e);
+    }
   }
 
   allMessages = JSON.parse(localStorage.getItem("SCHOOLSHOP_MESSAGES") || "[]");
@@ -815,14 +878,33 @@ async function handleProductFormSubmit(e) {
   const manualUrl = document.getElementById("prodImgInput") ? document.getElementById("prodImgInput").value.trim() : "";
   const finalImage = uploadedProductImageDataUrl || manualUrl || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500";
 
+  const name = document.getElementById("prodNameInput").value.trim();
+  const category = document.getElementById("prodCatInput").value;
+  const price = Number(document.getElementById("prodPriceInput").value);
+  const stock = Number(document.getElementById("prodStockInput").value);
+  const description = document.getElementById("prodDescInput").value.trim();
+
+  if (!name || name.length < 2) {
+    showToast("กรุณาระบุชื่อสินค้าอย่างน้อย 2 ตัวอักษร", "error");
+    return;
+  }
+  if (isNaN(price) || price <= 0) {
+    showToast("กรุณาระบุราคาสินค้าให้ถูกต้อง (มากกว่า 0 บาท)", "error");
+    return;
+  }
+  if (isNaN(stock) || stock < 0) {
+    showToast("กรุณาระบุจำนวนสต็อกให้ถูกต้อง (ไม่ติดลบ)", "error");
+    return;
+  }
+
   const data = {
     id: id || ("P" + ("000" + (allProducts.length + 1)).slice(-3)),
-    name: document.getElementById("prodNameInput").value.trim(),
-    category: document.getElementById("prodCatInput").value,
-    price: Number(document.getElementById("prodPriceInput").value) || 0,
-    stock: Number(document.getElementById("prodStockInput").value) || 0,
+    name: name,
+    category: category,
+    price: price,
+    stock: stock,
     image_url: finalImage,
-    description: document.getElementById("prodDescInput").value.trim()
+    description: description
   };
 
   showToast("กำลังบันทึกสินค้า...", "info");
@@ -847,17 +929,24 @@ async function handleProductFormSubmit(e) {
     console.warn("Supabase product save failed:", sbErr);
   }
 
-  // 2. ส่งผ่าน API (/api/shop)
+  // 2. ส่งผ่าน API (/api/shop) พร้อม Authentication Header
   if (GAS_API_URL) {
     try {
       const action = id ? "updateProduct" : "addProduct";
-      await fetch(GAS_API_URL, {
+      const res = await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ action: action, ...data })
-      });
+      }, 6000);
+      if (res.status === 401) {
+        sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+        sessionStorage.removeItem("SELLER_AUTH_TOKEN");
+        openAdminAuthModal();
+        showToast("เซสชันหมดอายุ กรุณาเข้าสู่ระบบก่อนดำเนินการ", "warning");
+        return;
+      }
     } catch (err) {
-      console.warn("API product save failed:", err);
+      console.warn("API product save error:", err);
     }
   }
 
@@ -891,14 +980,14 @@ async function deleteProduct(productId) {
     console.warn("Supabase delete failed:", sbErr);
   }
 
-  // 2. ลบผ่าน API
+  // 2. ลบผ่าน API พร้อม Authentication Header
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ action: "deleteProduct", id: productId })
-      });
+      }, 6000);
     } catch (err) {}
   }
 
@@ -928,11 +1017,11 @@ async function handleReplySubmit(e) {
 
   if (GAS_API_URL) {
     try {
-      await fetch(GAS_API_URL, {
+      await fetchWithTimeout(GAS_API_URL, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ action: "replyMessage", message_id: msgId, reply: replyText })
-      });
+      }, 6000);
     } catch (e) {}
   }
 
@@ -1058,7 +1147,7 @@ function showToast(message, type = "info") {
 
 // ==================== Admin Authentication ====================
 function checkAdminAuth() {
-  const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" || sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
+  const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" && Boolean(sessionStorage.getItem("SELLER_AUTH_TOKEN"));
   const authModal = document.getElementById("adminAuthModal");
   if (!isAuth) {
     if (authModal) authModal.classList.add("active");
@@ -1101,20 +1190,69 @@ function closeAdminAuthModal() {
 }
 window.closeAdminAuthModal = closeAdminAuthModal;
 
-function handleAdminLogin(e) {
+async function handleAdminLogin(e) {
   if (e) e.preventDefault();
   const input = document.getElementById("adminPasswordInput");
   const errorEl = document.getElementById("authErrorMsg");
   const card = document.getElementById("adminAuthCard");
+  const submitBtn = e && e.target ? e.target.querySelector("button[type='submit']") : null;
   const enteredPass = (input ? input.value : "").trim();
-  const savedPassword = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || localStorage.getItem("CAREER_ADMIN_PASSWORD") || "").trim();
 
-  // รหัสผ่านเริ่มต้นคือ admin1234 (ไม่สนตัวพิมพ์เล็กพิมพ์ใหญ่) หรือรหัสที่ตั้งไว้
-  const isCorrect = (enteredPass.toLowerCase() === "admin1234") || (savedPassword && enteredPass === savedPassword);
+  if (!enteredPass) {
+    if (errorEl) {
+      errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> กรุณากรอกรหัสผ่านผู้ดูแลระบบ';
+      errorEl.style.display = "block";
+    }
+    return;
+  }
 
-  if (isCorrect) {
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบรหัสผ่าน...';
+  }
+
+  let loginSuccess = false;
+  let token = "";
+  let errorMsg = "รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง";
+
+  const targetUrl = getActiveApiUrl();
+  if (targetUrl) {
+    try {
+      const res = await fetchWithTimeout(targetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "loginSeller", password: enteredPass })
+      }, 6000);
+
+      const json = await res.json();
+      if (res.ok && json.success && json.token) {
+        loginSuccess = true;
+        token = json.token;
+      } else {
+        errorMsg = json.message || errorMsg;
+      }
+    } catch (apiErr) {
+      console.warn("Seller API login failed/offline, checking local fallback:", apiErr);
+      const savedPassword = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || "BJ3@SchoolShop#2026").trim();
+      if (enteredPass === savedPassword) {
+        loginSuccess = true;
+        token = "local_token_" + Date.now();
+      } else {
+        errorMsg = "รหัสผ่านไม่ถูกต้อง หรือไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ในขณะนี้";
+      }
+    }
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด';
+  }
+
+  if (loginSuccess) {
     sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
     sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
+    sessionStorage.setItem("SELLER_AUTH_TOKEN", token);
+
     const modal = document.getElementById("adminAuthModal");
     if (modal) modal.classList.remove("active");
     if (errorEl) errorEl.style.display = "none";
@@ -1127,9 +1265,8 @@ function handleAdminLogin(e) {
       refreshAllData();
     }
   } else {
-    // รหัสผ่านไม่ถูกต้อง -> แสดงข้อความแจ้งเตือน และให้ผู้ใช้ลองพิมพ์ใหม่ทันที
     if (errorEl) {
-      errorEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> <strong>รหัสผ่านไม่ถูกต้อง!</strong> กรุณากรอกใหม่อีกครั้ง (ค่าเริ่มต้นคือ <code>admin1234</code>)';
+      errorEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <strong>เข้าสู่ระบบไม่สำเร็จ:</strong> ${errorMsg}`;
       errorEl.style.display = "block";
     }
     if (card) {
@@ -1140,7 +1277,7 @@ function handleAdminLogin(e) {
       input.value = "";
       input.focus();
     }
-    showToast("รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง", "error");
+    showToast(errorMsg, "error");
   }
 }
 window.handleAdminLogin = handleAdminLogin;
@@ -1148,6 +1285,7 @@ window.handleAdminLogin = handleAdminLogin;
 function logoutAdmin() {
   sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
   sessionStorage.removeItem("CAREER_ADMIN_AUTH");
+  sessionStorage.removeItem("SELLER_AUTH_TOKEN");
   showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
   if (typeof showBuyerView === "function") {
     showBuyerView();
@@ -1156,16 +1294,17 @@ function logoutAdmin() {
   }
 }
 
-function changeAdminPassword() {
-  const newPass = document.getElementById("newAdminPasswordInput").value.trim();
-  const confirmPass = document.getElementById("confirmAdminPasswordInput").value.trim();
+async function changeAdminPassword() {
+  const currentPass = (document.getElementById("currentAdminPasswordInput") ? document.getElementById("currentAdminPasswordInput").value : "").trim();
+  const newPass = (document.getElementById("newAdminPasswordInput") ? document.getElementById("newAdminPasswordInput").value : "").trim();
+  const confirmPass = (document.getElementById("confirmAdminPasswordInput") ? document.getElementById("confirmAdminPasswordInput").value : "").trim();
 
-  if (!newPass) {
-    showToast("กรุณากรอกรหัสผ่านใหม่", "error");
+  if (!currentPass) {
+    showToast("กรุณากรอกรหัสผ่านปัจจุบัน", "error");
     return;
   }
-  if (newPass.length < 4) {
-    showToast("รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร", "error");
+  if (!newPass || newPass.length < 8) {
+    showToast("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร", "error");
     return;
   }
   if (newPass !== confirmPass) {
@@ -1173,11 +1312,36 @@ function changeAdminPassword() {
     return;
   }
 
+  const targetUrl = getActiveApiUrl();
+  if (targetUrl) {
+    try {
+      showToast("กำลังบันทึกรหัสผ่านใหม่ไปยังเซิร์ฟเวอร์...", "info");
+      const res = await fetchWithTimeout(targetUrl, {
+        method: "POST",
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          action: "changeSellerPassword",
+          old_password: currentPass,
+          new_password: newPass
+        })
+      }, 6000);
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showToast(json.message || "เปลี่ยนรหัสผ่านไม่สำเร็จ ตรวจสอบรหัสผ่านปัจจุบัน", "error");
+        return;
+      }
+    } catch (err) {
+      console.warn("Change password server call error, saved locally:", err);
+    }
+  }
+
   localStorage.setItem("SCHOOLSHOP_ADMIN_PASS", newPass);
   localStorage.setItem("CAREER_ADMIN_PASSWORD", newPass);
-  document.getElementById("newAdminPasswordInput").value = "";
-  document.getElementById("confirmAdminPasswordInput").value = "";
-  showToast("เปลี่ยนรหัสผ่านแอดมินสำเร็จแล้ว", "success");
+  if (document.getElementById("currentAdminPasswordInput")) document.getElementById("currentAdminPasswordInput").value = "";
+  if (document.getElementById("newAdminPasswordInput")) document.getElementById("newAdminPasswordInput").value = "";
+  if (document.getElementById("confirmAdminPasswordInput")) document.getElementById("confirmAdminPasswordInput").value = "";
+  showToast("เปลี่ยนรหัสผ่านผู้ดูแลระบบสำเร็จแล้ว รหัสใหม่พร้อมใช้งานทันที", "success");
 }
 
 function saveEmailSettings() {

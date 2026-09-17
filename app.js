@@ -27,6 +27,24 @@ var GAS_API_URL = API_URL; // ให้เข้ากันได้กับ�
 window.API_URL = API_URL;
 window.GAS_API_URL = API_URL;
 
+// Helper: Fetch พร้อมระบบตัดเวลาอัตโนมัติ ป้องกันหน้าค้างที่ "กำลังโหลด..."
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
+// Flags ป้องกันการกดยืนยันสั่งซื้อ/สั่งจองเบิ้ล (Anti-Double Submit Guard)
+let isSubmittingOrder = false;
+let isSubmittingPreorder = false;
+
 // Supabase Direct Client Helper (หากมีการตั้งค่า URL และ Anon Key ไว้)
 function getSupabaseConfig() {
   const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
@@ -201,12 +219,12 @@ async function loadProducts() {
     }
   }
 
-  // 2. ลองดึงผ่าน Vercel Serverless Function API
+  // 2. ลองดึงผ่าน Vercel Serverless Function API พร้อม Timeout Guard 5 วินาที
   if (API_URL) {
     try {
-      const res = await fetch(`${API_URL}?action=getProducts`, {
+      const res = await fetchWithTimeout(`${API_URL}?action=getProducts`, {
         headers: getApiHeaders()
-      });
+      }, 5000);
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
         products = json.data;
@@ -215,7 +233,7 @@ async function loadProducts() {
         return;
       }
     } catch (err) {
-      console.warn("ไม่สามารถดึงข้อมูลจาก API ได้ ใช้ข้อมูลในเครื่องแทน:", err);
+      console.warn("ไม่สามารถดึงข้อมูลจาก API ได้ (Timeout/Offline) ใช้ข้อมูลสำรองในเครื่องแทน:", err);
     }
   }
 
@@ -1179,6 +1197,9 @@ function closeCheckoutModal() {
 
 async function handleOrderSubmit(e) {
   e.preventDefault();
+  if (isSubmittingOrder) return;
+  isSubmittingOrder = true;
+
   const submitBtn = document.getElementById("submitOrderBtn");
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกคำสั่งซื้อ...';
@@ -1189,21 +1210,45 @@ async function handleOrderSubmit(e) {
   const phone = (document.getElementById("custPhone") ? document.getElementById("custPhone").value : "").trim();
   const note = (document.getElementById("custNote") ? document.getElementById("custNote").value : "").trim();
 
-  if (!name) {
-    showToast("กรุณากรอกชื่อ-นามสกุลครับ", "error");
+  if (!name || name.length < 2) {
+    showToast("กรุณากรอกชื่อ-นามสกุลจริง (อย่างน้อย 2 ตัวอักษร)", "error");
+    isSubmittingOrder = false;
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
     return;
   }
 
-  if (!phone || phone.length < 9) {
-    showToast("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (อย่างน้อย 9-10 หลัก)", "error");
+  const phoneClean = phone.replace(/[-\s]/g, "");
+  const phoneRegex = /^0[0-9]{8,9}$/;
+  if (!phoneRegex.test(phoneClean)) {
+    showToast("กรุณากรอกเบอร์โทรศัพท์ที่ถูกต้อง (ขึ้นต้นด้วย 0 และมี 9-10 หลัก)", "error");
+    isSubmittingOrder = false;
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
     return;
   }
 
   const orderItems = (activeCheckoutItems && activeCheckoutItems.length > 0) ? activeCheckoutItems : cart;
+  if (!orderItems || orderItems.length === 0) {
+    showToast("ไม่มีสินค้าในรายการสั่งซื้อ", "error");
+    isSubmittingOrder = false;
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    return;
+  }
+
+  // ตรวจสอบสต็อกในเครื่องเบื้องต้นก่อนกดยืนยัน
+  for (const itm of orderItems) {
+    const p = products.find(prod => String(prod.id) === String(itm.id));
+    if (p && Number(p.stock) < Number(itm.quantity)) {
+      showToast(`ขออภัย สินค้า "${p.name}" เหลือเพียง ${p.stock} ชิ้น ไม่พอสำหรับจำนวนที่สั่ง (${itm.quantity} ชิ้น)`, "error");
+      isSubmittingOrder = false;
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+      return;
+    }
+  }
+
   const totalPrice = orderItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
 
   let orderData = {
@@ -1299,12 +1344,19 @@ async function handleOrderSubmit(e) {
 
     if (targetApiUrl) {
       try {
-        const response = await fetch(targetApiUrl, {
+        const response = await fetchWithTimeout(targetApiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...orderData, order_id: orderId })
-        });
+        }, 7000);
         const result = await response.json();
+        if (result && !result.success) {
+          showToast(result.message || "เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
+          isSubmittingOrder = false;
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+          return;
+        }
         if (result && result.success) {
           if (result.order_id) orderId = result.order_id;
           emailSentViaApi = true;
@@ -1312,7 +1364,7 @@ async function handleOrderSubmit(e) {
           console.log("Order saved and email notification dispatched via API:", result);
         }
       } catch (postErr) {
-        console.warn("API fetch POST failed:", postErr);
+        console.warn("API fetch POST failed/timeout:", postErr);
       }
     }
 
@@ -1388,6 +1440,7 @@ async function handleOrderSubmit(e) {
     console.error("Order error:", error);
     showToast("เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
   } finally {
+    isSubmittingOrder = false;
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
   }
@@ -1410,68 +1463,116 @@ function closeTrackModal() {
 async function searchOrders() {
   const query = document.getElementById("trackQueryInput").value.trim();
   const listEl = document.getElementById("trackResultList");
-  if (!query) {
-    showToast("กรุณากรอกเบอร์โทร หรือ ชื่อ หรือ รหัสคำสั่งซื้อ", "error");
+  if (!query || query.length < 3) {
+    showToast("กรุณากรอกเบอร์โทร หรือ รหัสคำสั่งซื้อ/สั่งจอง อย่างน้อย 3 ตัวอักษร", "warning");
     return;
   }
 
-  listEl.innerHTML = `<p style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> กำลังค้นหา...</p>`;
+  listEl.innerHTML = `<p style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> กำลังค้นหาข้อมูลคำสั่งซื้อและรายการจอง...</p>`;
 
   let matchedOrders = [];
+  let matchedPreorders = [];
 
   if (GAS_API_URL) {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=trackOrder&query=${encodeURIComponent(query)}`);
+      const res = await fetchWithTimeout(`${GAS_API_URL}?action=trackOrder&query=${encodeURIComponent(query)}`, {}, 6000);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        matchedOrders = json.data;
+      if (json && json.success) {
+        matchedOrders = json.orders || json.data || [];
+        matchedPreorders = json.preorders || [];
       }
     } catch (e) {
-      console.warn("GAS Search failed:", e);
+      console.warn("Server search failed/timeout, checking local:", e);
     }
   }
 
-  // หากไม่มีจาก GAS ให้หาจาก LocalStorage
-  if (matchedOrders.length === 0) {
-    const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
+  // หากไม่มีจากเซิร์ฟเวอร์ ให้ค้นหาจาก LocalStorage
+  if (matchedOrders.length === 0 && matchedPreorders.length === 0) {
     const q = query.toLowerCase();
+    const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
     matchedOrders = localOrders.filter(o => 
       (o.order_id && o.order_id.toLowerCase().includes(q)) ||
       (o.phone && o.phone.includes(q)) ||
       (o.student_name && o.student_name.toLowerCase().includes(q))
     );
+
+    const localPre = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
+    matchedPreorders = localPre.filter(p => 
+      (p.preorder_id && p.preorder_id.toLowerCase().includes(q)) ||
+      (p.phone && p.phone.includes(q)) ||
+      (p.student_name && p.student_name.toLowerCase().includes(q))
+    );
   }
 
-  if (matchedOrders.length === 0) {
+  if (matchedOrders.length === 0 && matchedPreorders.length === 0) {
     listEl.innerHTML = `
       <div style="text-align: center; padding: 1.5rem; background: var(--bg-main); border-radius: var(--radius-md);">
-        <p style="color: var(--text-muted);">ไม่พบข้อมูลคำสั่งซื้อที่ค้นหา</p>
+        <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 0.5rem;"></i>
+        <p style="color: var(--text-muted);">ไม่พบข้อมูลคำสั่งซื้อหรือรายการสั่งจองที่ตรงกับ "${query}"</p>
+        <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.25rem;">กรุณาตรวจสอบเบอร์โทรศัพท์หรือรหัสคำสั่งซื้ออีกครั้งครับ</p>
       </div>
     `;
     return;
   }
 
-  listEl.innerHTML = matchedOrders.map(order => {
-    let badgeClass = "badge-pending";
-    if (order.status === "กำลังจัดเตรียม") badgeClass = "badge-preparing";
-    else if (order.status === "พร้อมรับของ") badgeClass = "badge-ready";
-    else if (order.status === "สำเร็จ") badgeClass = "badge-completed";
-    else if (order.status === "ยกเลิก") badgeClass = "badge-cancelled";
+  let html = "";
 
-    return `
-      <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-card);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <strong style="color: var(--primary-dark);">${order.order_id}</strong>
-          <span class="badge ${badgeClass}">${order.status || 'รอดำเนินการ'}</span>
+  // 1. แสดงคำสั่งซื้อปกติ (COD)
+  if (matchedOrders.length > 0) {
+    html += `<h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--primary-dark);"><i class="fa-solid fa-bag-shopping"></i> รายการคำสั่งซื้อ (${matchedOrders.length} รายการ)</h4>`;
+    html += matchedOrders.map(order => {
+      let badgeClass = "badge-pending";
+      if (order.status === "กำลังจัดเตรียม") badgeClass = "badge-preparing";
+      else if (order.status === "พร้อมรับของ" || order.status === "พร้อมรับสินค้าแล้ว") badgeClass = "badge-ready";
+      else if (order.status === "สำเร็จ") badgeClass = "badge-completed";
+      else if (order.status === "ยกเลิก") badgeClass = "badge-cancelled";
+
+      return `
+        <div style="border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; background: var(--bg-card); margin-bottom: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <strong style="color: var(--primary-dark);"><i class="fa-solid fa-receipt"></i> ${order.order_id}</strong>
+            <span class="badge ${badgeClass}">${order.status || 'รอดำเนินการ'}</span>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+            <div>ผู้สั่ง: <strong>${order.student_name}</strong></div>
+            <div>จุดนัดรับ: <strong>${order.pickup_location || 'หมวดการงานอาชีพ'}</strong></div>
+            <div>ยอดชำระเงินปลายทาง: <strong style="color: var(--primary); font-size: 0.95rem;">${Number(order.total_price).toLocaleString()} ฿</strong></div>
+            ${order.timestamp ? `<div style="font-size: 0.78rem; color: var(--text-light);">เวลาสั่งซื้อ: ${order.timestamp}</div>` : ''}
+          </div>
         </div>
-        <div style="font-size: 0.85rem; color: var(--text-muted);">
-          <div>ผู้สั่ง: <strong>${order.student_name}</strong> (ชั้น ${order.student_class}/${order.student_room})</div>
-          <div>จุดรับของ: ${order.pickup_location || 'ห้องพักครูหมวดการงานอาชีพ'}</div>
-          <div>ยอดชำระ (COD): <strong style="color: var(--primary);">${Number(order.total_price).toLocaleString()} ฿</strong></div>
+      `;
+    }).join("");
+  }
+
+  // 2. แสดงรายการสั่งจองล่วงหน้า (Pre-order)
+  if (matchedPreorders.length > 0) {
+    html += `<h4 style="font-size: 0.95rem; margin-top: 1rem; margin-bottom: 0.5rem; color: #b45309;"><i class="fa-solid fa-clock"></i> รายการสั่งจองล่วงหน้า (${matchedPreorders.length} รายการ)</h4>`;
+    html += matchedPreorders.map(pre => {
+      let badgeClass = "badge-pending";
+      if (pre.status && pre.status.includes("กำหนดวันรับแล้ว")) badgeClass = "badge-ready";
+      else if (pre.status && (pre.status.includes("พร้อมรับ") || pre.status.includes("สำเร็จ"))) badgeClass = "badge-completed";
+      else if (pre.status === "ยกเลิก") badgeClass = "badge-cancelled";
+
+      return `
+        <div style="border: 1px solid #fde68a; border-radius: var(--radius-md); padding: 1rem; background: #fffbeb; margin-bottom: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <strong style="color: #92400e;"><i class="fa-solid fa-calendar-check"></i> ${pre.preorder_id}</strong>
+            <span class="badge ${badgeClass}">${pre.status || 'รอดำเนินการ'}</span>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.6;">
+            <div>สินค้าที่จอง: <strong>${pre.product_name}</strong> (จำนวน ${pre.quantity || 1} ชิ้น)</div>
+            <div>ผู้จอง: <strong>${pre.student_name}</strong></div>
+            <div style="color: #b45309; font-weight: 600;">
+              <i class="fa-regular fa-calendar-days"></i> วันนัดรับสินค้า: ${pre.delivery_date || 'รอคุณครูกำหนดวัน'}
+            </div>
+            <div>จุดรับสินค้า: ${pre.pickup_location || 'หมวดการงานอาชีพ'}</div>
+          </div>
         </div>
-      </div>
-    `;
-  }).join("");
+      `;
+    }).join("");
+  }
+
+  listEl.innerHTML = html;
 }
 
 // ==================== Preorder & Contact Forms ====================
@@ -1519,173 +1620,183 @@ function handleNotifyChannelChange() {
 
 async function handlePreorderSubmit(e) {
   e.preventDefault();
+  if (isSubmittingPreorder) return;
+  isSubmittingPreorder = true;
+
   const submitBtn = document.getElementById("submitPreorderBtn");
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกการจอง...';
 
-  const prodName = document.getElementById("preProdName").value.trim();
-  const prodQty = Number(document.getElementById("preProdQty").value) || 1;
-  const name = document.getElementById("preCustName").value.trim();
-  const phone = document.getElementById("preCustPhone").value.trim();
-  const buyerType = (document.getElementById("preBuyerType") && document.getElementById("preBuyerType").value) || "student";
-  const isTeacher = buyerType === "teacher";
-  const notifyChannel = document.getElementById("preNotifyChannel").value;
-  const notifyAccount = document.getElementById("preNotifyAccount").value.trim();
-  const note = document.getElementById("preCustNote").value.trim();
+  try {
+    const prodName = document.getElementById("preProdName").value.trim();
+    const prodQty = Number(document.getElementById("preProdQty").value) || 1;
+    const name = document.getElementById("preCustName").value.trim();
+    const phone = document.getElementById("preCustPhone").value.trim();
+    const buyerType = (document.getElementById("preBuyerType") && document.getElementById("preBuyerType").value) || "student";
+    const isTeacher = buyerType === "teacher";
+    const notifyChannel = document.getElementById("preNotifyChannel").value;
+    const notifyAccount = document.getElementById("preNotifyAccount").value.trim();
+    const note = document.getElementById("preCustNote").value.trim();
 
-  if (!prodName) {
-    showToast("กรุณาระบุชื่อสินค้าที่ต้องการสั่งจอง", "error");
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
-    return;
-  }
-
-  if (!name) {
-    showToast("กรุณากรอกชื่อ-นามสกุล", "error");
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
-    return;
-  }
-
-  if (!phone || phone.length < 9) {
-    showToast("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (อย่างน้อย 9-10 หลัก)", "error");
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
-    return;
-  }
-
-  if (!notifyAccount) {
-    showToast("กรุณากรอกข้อมูลช่องทางติดต่อแจ้งเตือน", "error");
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
-    return;
-  }
-
-  let pickupLoc = "";
-  let studentClass = "นักเรียน";
-  let studentRoom = "";
-  let studentNo = "-";
-  let department = "";
-
-  if (isTeacher) {
-    department = (document.getElementById("preTeacherDept") ? document.getElementById("preTeacherDept").value : "กลุ่มสาระการเรียนรู้การงานอาชีพ");
-    const tLocSelect = (document.getElementById("preTeacherLocationSelect") ? document.getElementById("preTeacherLocationSelect").value : "ห้องพักครูกลุ่มสาระการงานอาชีพ");
-    const tBuilding = (document.getElementById("preTeacherBuildingSelect") ? document.getElementById("preTeacherBuildingSelect").value : "").trim();
-    const tBuildingDetail = (document.getElementById("preTeacherBuildingDetail") ? document.getElementById("preTeacherBuildingDetail").value : "").trim();
-
-    pickupLoc = tLocSelect;
-    if (tBuilding) {
-      pickupLoc += ` (${tBuilding}${tBuildingDetail ? ' ' + tBuildingDetail : ''})`;
-    } else if (tBuildingDetail) {
-      pickupLoc += ` (${tBuildingDetail})`;
-    }
-
-    studentClass = "ครู: " + department;
-    studentRoom = "ห้องพักครู";
-    studentNo = "-";
-  } else {
-    studentRoom = (document.getElementById("preCustRoom") ? document.getElementById("preCustRoom").value : "").trim();
-    studentNo = (document.getElementById("preCustNo") ? document.getElementById("preCustNo").value : "").trim() || "-";
-    pickupLoc = (document.getElementById("preCustLocationStudent") ? document.getElementById("preCustLocationStudent").value : "หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)");
-    department = "-";
-
-    if (!studentRoom) {
-      showToast("กรุณากรอกเลขห้องของนักเรียนครับ", "error");
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    if (!prodName) {
+      showToast("กรุณาระบุชื่อสินค้าที่ต้องการสั่งจอง", "error");
       return;
     }
-  }
 
-  const data = {
-    action: "createPreorder",
-    product_name: prodName,
-    quantity: prodQty,
-    student_name: name,
-    buyer_type: isTeacher ? "คุณครู" : "นักเรียน",
-    department: department,
-    student_class: studentClass,
-    student_room: studentRoom,
-    student_no: studentNo,
-    pickup_location: pickupLoc,
-    phone: phone,
-    notify_channel: notifyChannel,
-    notify_account: notifyAccount,
-    delivery_date: "รอคุณครูกำหนดวัน",
-    note: note,
-    seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "",
-    admin_emails: localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL
-  };
-
-  let preId = "PRE-" + Date.now().toString().slice(-6);
-  const targetApiUrl = getActiveApiUrl();
-  let preorderSentViaApi = false;
-
-  if (targetApiUrl) {
-    try {
-      const response = await fetch(targetApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, preorder_id: preId })
-      });
-      const resJson = await response.json();
-      if (resJson && resJson.success) {
-        if (resJson.preorder_id) preId = resJson.preorder_id;
-        preorderSentViaApi = true;
-        console.log("Preorder saved and email dispatched via API:", resJson);
-      }
-    } catch (err) {
-      console.warn("Preorder API POST error:", err);
+    if (isNaN(prodQty) || prodQty < 1 || prodQty > 10) {
+      showToast("สามารถสั่งจองได้ครั้งละ 1 - 10 ชิ้นเท่านั้นครับ", "error");
+      return;
     }
+
+    if (!name || name.length < 2) {
+      showToast("กรุณากรอกชื่อ-นามสกุลจริง (อย่างน้อย 2 ตัวอักษร)", "error");
+      return;
+    }
+
+    const phoneClean = phone.replace(/[-\s]/g, "");
+    const phoneRegex = /^0[0-9]{8,9}$/;
+    if (!phoneRegex.test(phoneClean)) {
+      showToast("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (ขึ้นต้นด้วย 0 และมี 9-10 หลัก)", "error");
+      return;
+    }
+
+    if (!notifyAccount) {
+      showToast("กรุณากรอกข้อมูลช่องทางติดต่อแจ้งเตือน", "error");
+      return;
+    }
+
+    let pickupLoc = "";
+    let studentClass = "นักเรียน";
+    let studentRoom = "";
+    let studentNo = "-";
+    let department = "";
+
+    if (isTeacher) {
+      department = (document.getElementById("preTeacherDept") ? document.getElementById("preTeacherDept").value : "กลุ่มสาระการเรียนรู้การงานอาชีพ");
+      const tLocSelect = (document.getElementById("preTeacherLocationSelect") ? document.getElementById("preTeacherLocationSelect").value : "ห้องพักครูกลุ่มสาระการงานอาชีพ");
+      const tBuilding = (document.getElementById("preTeacherBuildingSelect") ? document.getElementById("preTeacherBuildingSelect").value : "").trim();
+      const tBuildingDetail = (document.getElementById("preTeacherBuildingDetail") ? document.getElementById("preTeacherBuildingDetail").value : "").trim();
+
+      pickupLoc = tLocSelect;
+      if (tBuilding) {
+        pickupLoc += ` (${tBuilding}${tBuildingDetail ? ' ' + tBuildingDetail : ''})`;
+      } else if (tBuildingDetail) {
+        pickupLoc += ` (${tBuildingDetail})`;
+      }
+
+      studentClass = "ครู: " + department;
+      studentRoom = "ห้องพักครู";
+      studentNo = "-";
+    } else {
+      studentRoom = (document.getElementById("preCustRoom") ? document.getElementById("preCustRoom").value : "").trim();
+      studentNo = (document.getElementById("preCustNo") ? document.getElementById("preCustNo").value : "").trim() || "-";
+      pickupLoc = (document.getElementById("preCustLocationStudent") ? document.getElementById("preCustLocationStudent").value : "หมวดการงานอาชีพ (ห้องพักครูหมวดการงานอาชีพ)");
+      department = "-";
+
+      if (!studentRoom) {
+        showToast("กรุณากรอกเลขห้องของนักเรียนครับ", "error");
+        return;
+      }
+    }
+
+    const data = {
+      action: "createPreorder",
+      product_name: prodName,
+      quantity: prodQty,
+      student_name: name,
+      buyer_type: isTeacher ? "คุณครู" : "นักเรียน",
+      department: department,
+      student_class: studentClass,
+      student_room: studentRoom,
+      student_no: studentNo,
+      pickup_location: pickupLoc,
+      phone: phone,
+      notify_channel: notifyChannel,
+      notify_account: notifyAccount,
+      delivery_date: "รอคุณครูกำหนดวัน",
+      note: note,
+      seller_token: localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKENS") || localStorage.getItem("SCHOOLSHOP_SELLER_LINE_TOKEN") || "",
+      admin_emails: localStorage.getItem("SCHOOLSHOP_ADMIN_EMAILS") || DEFAULT_ADMIN_EMAIL
+    };
+
+    let preId = "PRE-" + Date.now().toString().slice(-6);
+    const targetApiUrl = getActiveApiUrl();
+    let preorderSentViaApi = false;
+
+    if (targetApiUrl) {
+      try {
+        const response = await fetchWithTimeout(targetApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...data, preorder_id: preId })
+        }, 7000);
+        const resJson = await response.json();
+        if (resJson && !resJson.success) {
+          showToast(resJson.message || "เกิดข้อผิดพลาดในการบันทึกการสั่งจอง", "error");
+          return;
+        }
+        if (resJson && resJson.success) {
+          if (resJson.preorder_id) preId = resJson.preorder_id;
+          preorderSentViaApi = true;
+          console.log("Preorder saved and email dispatched via API:", resJson);
+        }
+      } catch (err) {
+        console.warn("Preorder API POST error/timeout:", err);
+      }
+    }
+
+    // Fallback direct FormSubmit หากจำเป็นและอยู่บน Web Server
+    if (!preorderSentViaApi && window.location.protocol !== "file:") {
+      try {
+        const emailTarget = data.admin_emails || DEFAULT_ADMIN_EMAIL;
+        const firstEmail = emailTarget.split(/[,;\n\s]+/)[0].trim();
+        fetch(`https://formsubmit.co/ajax/${encodeURIComponent(firstEmail)}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            _subject: `🔔 [รายการสั่งจองใหม่] รหัส ${preId} - ${data.product_name} (${data.quantity} ชิ้น)`,
+            _template: "table",
+            _captcha: "false",
+            "ประเภทรายการ": "รายการสั่งจองสินค้าล่วงหน้า (Pre-order)",
+            "รหัสการสั่งจอง": preId,
+            "ผู้สั่งจอง": `${data.student_name} (${data.buyer_type})`,
+            "เบอร์โทรติดต่อ": data.phone,
+            "สินค้าที่สั่งจอง": data.product_name,
+            "จำนวนที่จอง": `${data.quantity} ชิ้น`,
+            "ช่องทางแจ้งเตือน": `${data.notify_channel}: ${data.notify_account}`,
+            "จุดนัดรับ": data.pickup_location || "หมวดการงานอาชีพ",
+            "หมายเหตุ": data.note || "ไม่มี"
+          })
+        }).catch(e => console.warn("Fallback direct preorder email failed:", e));
+      } catch (e) {}
+    }
+
+    // เก็บ LocalStorage
+    const preorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
+    preorders.unshift({
+      preorder_id: preId,
+      timestamp: new Date().toLocaleString("th-TH"),
+      ...data,
+      status: "รอดำเนินการ (รอครูกำหนดวัน)"
+    });
+    localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(preorders));
+
+    closePreorderModal();
+    document.getElementById("preorderForm").reset();
+    showToast(`สั่งจองสำเร็จ! รหัสการจอง: ${preId}`, "success");
+    
+    alert(`🎉 สั่งจองสินค้าสำเร็จเรียบร้อยครับ!\n\nรหัสการจอง: ${preId}\nสินค้า: ${data.product_name} (จำนวน ${data.quantity} ชิ้น)\nผู้สั่งจอง: ${data.student_name} (เบอร์โทร: ${data.phone})\n\n⏳ ข้อตกลงการรับสินค้า: การสั่งจองสินค้าต้องรอจัดเตรียมอย่างน้อย 2 - 3 วัน หรือตามกำหนดวันที่คุณครูผู้ขายได้กำหนดไว้\n\n🔔 เมื่อสินค้าพร้อมรับ ระบบจะส่งแจ้งเตือนผ่าน ${data.notify_channel} (${data.notify_account}) หรือเบอร์โทร ${data.phone} ของท่านครับ ขอบคุณครับ`);
+  } catch (err) {
+    console.error("Preorder submission error:", err);
+    showToast("เกิดข้อผิดพลาดในการสั่งจอง กรุณาลองใหม่อีกครั้ง", "error");
+  } finally {
+    isSubmittingPreorder = false;
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
   }
-
-  // Fallback direct FormSubmit หากจำเป็นและอยู่บน Web Server
-  if (!preorderSentViaApi && window.location.protocol !== "file:") {
-    try {
-      const emailTarget = data.admin_emails || DEFAULT_ADMIN_EMAIL;
-      const firstEmail = emailTarget.split(/[,;\n\s]+/)[0].trim();
-      fetch(`https://formsubmit.co/ajax/${encodeURIComponent(firstEmail)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          _subject: `🔔 [รายการสั่งจองใหม่] รหัส ${preId} - ${data.product_name} (${data.quantity} ชิ้น)`,
-          _template: "table",
-          _captcha: "false",
-          "ประเภทรายการ": "รายการสั่งจองสินค้าล่วงหน้า (Pre-order)",
-          "รหัสการสั่งจอง": preId,
-          "ผู้สั่งจอง": `${data.student_name} (${data.buyer_type})`,
-          "เบอร์โทรติดต่อ": data.phone,
-          "สินค้าที่สั่งจอง": data.product_name,
-          "จำนวนที่จอง": `${data.quantity} ชิ้น`,
-          "ช่องทางแจ้งเตือน": `${data.notify_channel}: ${data.notify_account}`,
-          "จุดนัดรับ": data.pickup_location || "หมวดการงานอาชีพ",
-          "หมายเหตุ": data.note || "ไม่มี"
-        })
-      }).catch(e => console.warn("Fallback direct preorder email failed:", e));
-    } catch (e) {}
-  }
-
-  // เก็บ LocalStorage
-  const preorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
-  preorders.unshift({
-    preorder_id: preId,
-    timestamp: new Date().toLocaleString("th-TH"),
-    ...data,
-    status: "รอดำเนินการ (รอครูกำหนดวัน)"
-  });
-  localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(preorders));
-
-  closePreorderModal();
-  document.getElementById("preorderForm").reset();
-  showToast(`สั่งจองสำเร็จ! รหัสการจอง: ${preId}`, "success");
-  
-  alert(`🎉 สั่งจองสินค้าสำเร็จเรียบร้อยครับ!\n\nรหัสการจอง: ${preId}\nสินค้า: ${data.product_name} (จำนวน ${data.quantity} ชิ้น)\nผู้สั่งจอง: ${data.student_name} (เบอร์โทร: ${data.phone})\n\n⏳ ข้อตกลงการรับสินค้า: การสั่งจองสินค้าต้องรอจัดเตรียมอย่างน้อย 2 - 3 วัน หรือตามกำหนดวันที่คุณครูผู้ขายได้กำหนดไว้\n\n🔔 เมื่อสินค้าพร้อมรับ ระบบจะส่งแจ้งเตือนผ่าน ${data.notify_channel} (${data.notify_account}) หรือเบอร์โทร ${data.phone} ของท่านครับ ขอบคุณครับ`);
-
-  submitBtn.disabled = false;
-  submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
 }
 
 function openContactModal() {

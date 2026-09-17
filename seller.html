@@ -11,9 +11,9 @@
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script>
-    // ตรวจสอบการล็อกอินเมื่อเปิด seller.html หากยังไม่ล็อกอิน ให้แสดงหน้าต่างกรอกรหัสผ่าน
+    // ตรวจสอบการล็อกอินเมื่อเปิด seller.html หากยังไม่ล็อกอินหรือไม่มี Token ให้แสดงหน้าต่างล็อกอิน
     document.addEventListener("DOMContentLoaded", () => {
-      const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" || sessionStorage.getItem("CAREER_ADMIN_AUTH") === "true";
+      const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" && Boolean(sessionStorage.getItem("SELLER_AUTH_TOKEN"));
       const authModal = document.getElementById("adminAuthModal");
       if (!isAuth) {
         if (authModal) authModal.classList.add("active");
@@ -330,16 +330,20 @@
           <i class="fa-solid fa-key"></i> เปลี่ยนรหัสผ่านเข้าสู่ระบบผู้ขาย/แอดมิน
         </h3>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-          รหัสผ่านนี้ใช้ป้องกันไม่ให้นักเรียนหรือผู้ซื้อทั่วไปเข้าถึงหน้านี้ (ค่าเริ่มต้น: <code>admin1234</code>)
+          รหัสผ่านนี้ใช้ป้องกันไม่ให้นักเรียนหรือผู้ซื้อทั่วไปเข้าถึงระบบหลังบ้าน (ความยาวอย่างน้อย 8 ตัวอักษร)
         </p>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">รหัสผ่านใหม่:</label>
-            <input type="password" id="newAdminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านใหม่">
+            <label class="form-label"><i class="fa-solid fa-lock"></i> รหัสผ่านปัจจุบัน:</label>
+            <input type="password" id="currentAdminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านปัจจุบัน" required>
           </div>
           <div class="form-group">
-            <label class="form-label">ยืนยันรหัสผ่านใหม่:</label>
-            <input type="password" id="confirmAdminPasswordInput" class="form-input" placeholder="ยืนยันรหัสผ่าน">
+            <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านใหม่:</label>
+            <input type="password" id="newAdminPasswordInput" class="form-input" placeholder="รหัสผ่านใหม่อย่างน้อย 8 ตัวอักษร" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fa-solid fa-check-double"></i> ยืนยันรหัสผ่านใหม่:</label>
+            <input type="password" id="confirmAdminPasswordInput" class="form-input" placeholder="ยืนยันรหัสผ่านใหม่" required>
           </div>
         </div>
         <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="changeAdminPassword()">
@@ -532,7 +536,7 @@
         <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
-            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่าน (ค่าเริ่มต้น: admin1234)" autofocus required>
+            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านผู้ดูแลระบบ" autofocus required>
           </div>
           <div id="authErrorMsg" style="color: var(--danger); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem; display: none;">
             <i class="fa-solid fa-circle-exclamation"></i> รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง

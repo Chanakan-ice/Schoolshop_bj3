@@ -1,10 +1,12 @@
 /**
  * Vercel Serverless Function: /api/shop
- * ทำหน้าที่เป็น REST API แทน Google Apps Script
+ * ทำหน้าที่เป็น REST API สำหรับระบบซื้อของในโรงเรียน SchoolShop BJ3
  * รองรับ:
  * 1. Supabase REST API Cloud Database
  * 2. In-Memory Persistent Store (Zero-Config)
  * 3. ส่งอีเมลแจ้งเตือนคุณครู/แอดมินอัตโนมัติ (FormSubmit + Resend API)
+ * 4. ระบบยืนยันตัวตน Seller Authentication (Session Token & Role Protection)
+ * 5. ป้องกันคำสั่งซื้อซ้ำซ้อน (Anti-Spam / Concurrency / Stock Guard)
  */
 
 // In-Memory Persistent Store
@@ -69,6 +71,68 @@ let memoryOrders = [];
 let memoryPreorders = [];
 let memoryMessages = [];
 
+// ==============================================================================
+// Authentication & Security State
+// ==============================================================================
+let currentAdminPassword = process.env.SELLER_ADMIN_PASSWORD || "BJ3@SchoolShop#2026";
+const activeSellerTokens = new Map(); // token -> { expiresAt, ip }
+const recentSubmissions = new Map();  // key -> timestamp
+const loginFailures = new Map();      // ip -> { count, lockedUntil }
+
+function generateToken() {
+  const rand = () => Math.random().toString(36).substring(2);
+  return "stk_" + Date.now().toString(36) + "_" + rand() + rand() + rand();
+}
+
+function getClientIp(req) {
+  const xf = req.headers["x-forwarded-for"];
+  if (xf) return xf.split(",")[0].trim();
+  return (req.connection && req.connection.remoteAddress) || (req.socket && req.socket.remoteAddress) || "127.0.0.1";
+}
+
+function checkRateLimit(ip) {
+  const record = loginFailures.get(ip);
+  if (!record) return true;
+  if (record.lockedUntil && record.lockedUntil > Date.now()) {
+    return false;
+  }
+  return true;
+}
+
+function recordLoginFailure(ip) {
+  const record = loginFailures.get(ip) || { count: 0, lockedUntil: 0 };
+  record.count += 1;
+  if (record.count >= 5) {
+    record.lockedUntil = Date.now() + 5 * 60 * 1000; // ล็อก 5 นาทีเมื่อกรอกผิด 5 ครั้ง
+    record.count = 0;
+  }
+  loginFailures.set(ip, record);
+}
+
+function isValidSellerToken(req) {
+  const authHeader = req.headers["x-seller-token"] || req.headers["authorization"] || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+
+  const session = activeSellerTokens.get(token);
+  if (!session) return false;
+  if (session.expiresAt < Date.now()) {
+    activeSellerTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function maskSensitiveData(list) {
+  return (list || []).map(item => {
+    const copy = { ...item };
+    if (copy.phone && typeof copy.phone === "string" && copy.phone.length >= 8) {
+      copy.phone = copy.phone.replace(/(\d{3})\d{3,4}(\d{3,4})/, "$1-xxx-$2");
+    }
+    return copy;
+  });
+}
+
 /**
  * ฟังก์ชันส่งอีเมลแจ้งเตือน (Email Notification Dispatcher)
  * รองรับทั้ง Resend API และ FormSubmit (Zero-config ไม่ต้องมี API Key)
@@ -98,7 +162,8 @@ async function sendEmailNotification({ toEmails, subject, fields, htmlContent, r
         subject: subject,
         html: htmlContent || Object.entries(fields).map(([k, v]) => `<p><strong>${k}:</strong> ${v}</p>`).join("")
       };
-      const res = await fetch("https://api.resend.com/emails", {
+
+      const resendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
@@ -106,34 +171,34 @@ async function sendEmailNotification({ toEmails, subject, fields, htmlContent, r
         },
         body: JSON.stringify(resendPayload)
       });
-      if (res.ok) {
+
+      if (resendRes.ok) {
         sentSuccessfully = true;
-        console.log("Email delivered via Resend API successfully");
+        return true;
       }
     } catch (err) {
-      console.warn("Resend API delivery error:", err.message);
+      console.warn("Resend email dispatch error:", err.message);
     }
   }
 
-  if (!emails.includes("schoolshop.bj3@gmail.com")) {
-    emails.unshift("schoolshop.bj3@gmail.com");
-  }
-  emails = [...new Set(emails)];
-
-  // วิธีที่ 2: ส่งผ่าน FormSubmit.co ไปยังทุกอีเมล (รองรับหลายอีเมลด้วย _cc และส่งตรง)
+  // วิธีที่ 2: Zero-Config FormSubmit Dispatcher
   if (!sentSuccessfully) {
     const primaryEmail = emails[0];
     const ccEmails = emails.slice(1);
 
+    const formSubmitPayload = {
+      _subject: subject,
+      _template: "table",
+      _captcha: "false",
+      ...fields
+    };
+
+    if (ccEmails.length > 0) {
+      formSubmitPayload._cc = ccEmails.join(",");
+    }
+
     try {
-      const primaryPayload = {
-        _subject: subject,
-        _template: "table",
-        _captcha: "false",
-        ...(ccEmails.length > 0 ? { _cc: ccEmails.join(",") } : {}),
-        ...fields
-      };
-      const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(primaryEmail)}`, {
+      const fsRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(primaryEmail)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -141,16 +206,17 @@ async function sendEmailNotification({ toEmails, subject, fields, htmlContent, r
           "Referer": "https://schoolshop.vercel.app/",
           "Origin": "https://schoolshop.vercel.app"
         },
-        body: JSON.stringify(primaryPayload)
+        body: JSON.stringify(formSubmitPayload)
       });
-      const result = await response.json();
-      console.log(`FormSubmit primary delivery to ${primaryEmail} (CC: ${ccEmails.join(",")}):`, result);
-      sentSuccessfully = true;
+
+      if (fsRes.ok) {
+        sentSuccessfully = true;
+      }
     } catch (err) {
       console.warn(`FormSubmit primary delivery error:`, err.message);
     }
 
-    // ส่งสำเนาตรงไปยังอีเมลคุณครูท่านอื่นๆ เพื่อความแน่นอน 100%
+    // ส่งสำเนาตรงไปยังอีเมลคุณครูท่านอื่นๆ เพื่อความแน่นอน
     if (ccEmails.length > 0) {
       for (const email of ccEmails) {
         try {
@@ -185,7 +251,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Supabase-Url, X-Supabase-Key, X-Resend-Key"
+    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Supabase-Url, X-Supabase-Key, X-Resend-Key, X-Seller-Token, Authorization"
   );
 
   if (req.method === "OPTIONS") {
@@ -237,6 +303,7 @@ export default async function handler(req, res) {
     // GET Requests
     // -------------------------------------------------------------
     if (req.method === "GET") {
+      // 1. รายการสินค้า (สาธารณะ: หน้าร้าน + หลังร้าน)
       if (action === "getProducts") {
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
@@ -251,7 +318,20 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: memoryProducts });
       }
 
+      // 2. ตรวจสอบสถานะการล็อกอินของผู้ขาย
+      if (action === "verifySellerSession") {
+        return res.status(200).json({ success: true, valid: isValidSellerToken(req) });
+      }
+
+      // 3. รายการคำสั่งซื้อ (เฉพาะผู้ขาย/แอดมิน - ป้องกันข้อมูลส่วนบุคคล)
       if (action === "getOrders") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized: ต้องเข้าสู่ระบบผู้ขาย/แอดมินก่อนเข้าถึงข้อมูลคำสั่งซื้อ"
+          });
+        }
+
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
             const data = await supabaseRequest("orders?select=*&order=created_at.desc");
@@ -263,7 +343,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: memoryOrders });
       }
 
+      // 4. รายการสั่งจอง (เฉพาะผู้ขาย/แอดมิน)
       if (action === "getPreorders") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized: ต้องเข้าสู่ระบบผู้ขาย/แอดมินก่อนเข้าถึงข้อมูลการสั่งจอง"
+          });
+        }
+
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
             const data = await supabaseRequest("preorders?select=*&order=created_at.desc");
@@ -275,7 +363,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: memoryPreorders });
       }
 
+      // 5. รายการข้อความ (เฉพาะผู้ขาย/แอดมิน)
       if (action === "getMessages") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized: ต้องเข้าสู่ระบบก่อนเข้าถึงข้อความติดต่อ"
+          });
+        }
+
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
             const data = await supabaseRequest("messages?select=*&order=created_at.desc");
@@ -287,31 +383,45 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: memoryMessages });
       }
 
+      // 6. ติดตามสถานะคำสั่งซื้อสำหรับผู้ซื้อ (ปลอดภัย ไม่แสดงข้อมูลสุ่ม)
       if (action === "trackOrder") {
         const query = (req.query.query || "").trim();
-        if (!query) {
-          return res.status(200).json({ success: true, orders: [], preorders: [] });
+        // ต้องกรอกอย่างน้อย 3 ตัวอักษร เพื่อป้องกันการดึงออเดอร์ทั้งหมด
+        if (!query || query.length < 3) {
+          return res.status(200).json({
+            success: true,
+            orders: [],
+            preorders: [],
+            message: "กรุณาระบุรหัสออเดอร์ หรือเบอร์โทรศัพท์อย่างน้อย 3 ตัวอักษร"
+          });
         }
+
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
-            const orders = await supabaseRequest(`orders?or=(order_id.ilike.%25${encodeURIComponent(query)}%25,student_name.ilike.%25${encodeURIComponent(query)}%25,phone.ilike.%25${encodeURIComponent(query)}%25)`);
-            const preorders = await supabaseRequest(`preorders?or=(preorder_id.ilike.%25${encodeURIComponent(query)}%25,student_name.ilike.%25${encodeURIComponent(query)}%25,phone.ilike.%25${encodeURIComponent(query)}%25)`);
-            return res.status(200).json({ success: true, orders: orders || [], preorders: preorders || [] });
+            const orders = await supabaseRequest(`orders?or=(order_id.ilike.%25${encodeURIComponent(query)}%25,phone.ilike.%25${encodeURIComponent(query)}%25)`);
+            const preorders = await supabaseRequest(`preorders?or=(preorder_id.ilike.%25${encodeURIComponent(query)}%25,phone.ilike.%25${encodeURIComponent(query)}%25)`);
+            return res.status(200).json({
+              success: true,
+              orders: maskSensitiveData(orders || []),
+              preorders: maskSensitiveData(preorders || [])
+            });
           } catch (e) {}
         }
 
         const q = query.toLowerCase();
         const matchedOrders = memoryOrders.filter(o => 
           (o.order_id && o.order_id.toLowerCase().includes(q)) ||
-          (o.student_name && o.student_name.toLowerCase().includes(q)) ||
           (o.phone && o.phone.includes(q))
         );
         const matchedPre = memoryPreorders.filter(p => 
           (p.preorder_id && p.preorder_id.toLowerCase().includes(q)) ||
-          (p.student_name && p.student_name.toLowerCase().includes(q)) ||
           (p.phone && p.phone.includes(q))
         );
-        return res.status(200).json({ success: true, orders: matchedOrders, preorders: matchedPre });
+        return res.status(200).json({
+          success: true,
+          orders: maskSensitiveData(matchedOrders),
+          preorders: maskSensitiveData(matchedPre)
+        });
       }
 
       // ทดสอบส่งอีเมล (GET)
@@ -330,7 +440,7 @@ export default async function handler(req, res) {
         });
         return res.status(200).json({
           success: true,
-          message: `ส่งอีเมลทดสอบไปยัง ${emails} เรียบร้อยแล้ว (หากเป็นครั้งแรก กรุณาตรวจสอบกล่องจดหมายหรือโฟลเดอร์สแปม เพื่อกด Activate Form)`
+          message: `ส่งอีเมลทดสอบไปยัง ${emails} เรียบร้อยแล้ว`
         });
       }
 
@@ -346,6 +456,78 @@ export default async function handler(req, res) {
     // -------------------------------------------------------------
     if (req.method === "POST") {
       const postAction = body.action || action;
+      const clientIp = getClientIp(req);
+
+      // =========================================================
+      // 0. Seller Authentication: Login
+      // =========================================================
+      if (postAction === "loginSeller") {
+        if (!checkRateLimit(clientIp)) {
+          return res.status(429).json({
+            success: false,
+            message: "คุณกรอกรหัสผ่านผิดเกินกำหนด กรุณารอ 5 นาทีแล้วลองใหม่อีกครั้งเพื่อความปลอดภัย"
+          });
+        }
+
+        const password = String(body.password || "").trim();
+        if (password === currentAdminPassword) {
+          // รีเซ็ตประวัติการล็อกอินผิด
+          loginFailures.delete(clientIp);
+
+          // ออก Session Token อายุ 24 ชั่วโมง
+          const token = generateToken();
+          const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+          activeSellerTokens.set(token, { expiresAt, ip: clientIp });
+
+          return res.status(200).json({
+            success: true,
+            message: "เข้าสู่ระบบผู้ดูแลสำเร็จ",
+            token: token,
+            expiresIn: 86400
+          });
+        } else {
+          recordLoginFailure(clientIp);
+          return res.status(401).json({
+            success: false,
+            message: "รหัสผ่านผู้ดูแลไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง"
+          });
+        }
+      }
+
+      // =========================================================
+      // 0.1 Seller Authentication: Change Password
+      // =========================================================
+      if (postAction === "changeSellerPassword") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({
+            success: false,
+            message: "Unauthorized: กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน"
+          });
+        }
+
+        const oldPass = String(body.old_password || "").trim();
+        const newPass = String(body.new_password || "").trim();
+
+        if (oldPass !== currentAdminPassword) {
+          return res.status(400).json({
+            success: false,
+            message: "รหัสผ่านปัจจุบันไม่ถูกต้อง"
+          });
+        }
+
+        if (!newPass || newPass.length < 8) {
+          return res.status(400).json({
+            success: false,
+            message: "รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร"
+          });
+        }
+
+        currentAdminPassword = newPass;
+        return res.status(200).json({
+          success: true,
+          message: "เปลี่ยนรหัสผ่านผู้ดูแลระบบเรียบร้อยแล้ว รหัสใหม่มีผลทันที"
+        });
+      }
 
       // ทดสอบส่งอีเมล (POST)
       if (postAction === "testEmail") {
@@ -358,29 +540,89 @@ export default async function handler(req, res) {
             "สถานะการทำงาน": "พร้อมใช้งาน 100%",
             "รายชื่ออีเมลผู้รับ": typeof emails === "string" ? emails : emails.join(", "),
             "วันที่และเวลา": new Date().toLocaleString("th-TH"),
-            "ข้อความ": "ระบบแจ้งเตือนทางอีเมลของร้านค้าหมวดการงานอาชีพพร้อมใช้งานแล้ว เมื่อมีคำสั่งซื้อใหม่ (COD) หรือรายการสั่งจองใหม่ (Pre-order) ข้อมูลภาษาไทยจะถูกส่งมายังทุกอีเมลที่ตั้งค่าไว้อัตโนมัติ"
+            "ข้อความ": "ระบบแจ้งเตือนทางอีเมลของร้านค้าหมวดการงานอาชีพพร้อมใช้งานแล้ว"
           },
           resendKey: RESEND_KEY || body.resend_key
         });
         return res.status(200).json({
           success: true,
-          message: `ส่งอีเมลทดสอบไปยัง ${emails} เรียบร้อยแล้ว! (หากเป็นครั้งแรก กรุณาตรวจสอบอีเมลเพื่อกดปุ่มยืนยัน Activate Form)`
+          message: `ส่งอีเมลทดสอบไปยัง ${emails} เรียบร้อยแล้ว!`
         });
       }
 
-      // 1. สร้างคำสั่งซื้อใหม่ (Create Order)
+      // =========================================================
+      // 1. สร้างคำสั่งซื้อใหม่ (Create Order - Anti-Spam & Concurrency Guard)
+      // =========================================================
       if (postAction === "createOrder") {
+        const customerName = String(body.student_name || "").trim();
+        const customerPhone = String(body.phone || "").trim();
+        const rawItems = Array.isArray(body.items) ? body.items : [];
+
+        if (!customerName) {
+          return res.status(400).json({ success: false, message: "กรุณากรอกชื่อผู้สั่งซื้อ" });
+        }
+        if (!customerPhone || customerPhone.length < 9) {
+          return res.status(400).json({ success: false, message: "กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (9-10 หลัก)" });
+        }
+        if (rawItems.length === 0) {
+          return res.status(400).json({ success: false, message: "ไม่มีรายการสินค้าในคำสั่งซื้อ" });
+        }
+
+        // Anti-Spam / Idempotency Check: ป้องกันการกดยืนยันสั่งซื้อซ้ำซ้อนภายใน 8 วินาที
+        const spamKey = `order_${customerPhone}_${body.total_price}`;
+        if (recentSubmissions.has(spamKey)) {
+          const prevTime = recentSubmissions.get(spamKey);
+          if (Date.now() - prevTime < 8000) {
+            return res.status(429).json({
+              success: false,
+              message: "ระบบกำลังประมวลผลคำสั่งซื้อของคุณอยู่แล้ว กรุณารอสักครู่ ไม่จำเป็นต้องกดซ้ำครับ"
+            });
+          }
+        }
+        recentSubmissions.set(spamKey, Date.now());
+
+        // ตรวจสอบสต็อกสินค้าก่อนตัด (Stock Sufficiency & Concurrency Protection)
+        for (const itm of rawItems) {
+          const reqQty = Math.max(1, Number(itm.quantity) || 1);
+          
+          if (SUPABASE_URL && SUPABASE_KEY) {
+            try {
+              const remoteProds = await supabaseRequest(`products?id=eq.${encodeURIComponent(itm.id)}`);
+              if (remoteProds && remoteProds.length > 0) {
+                const currentStock = Number(remoteProds[0].stock) || 0;
+                if (currentStock < reqQty) {
+                  return res.status(400).json({
+                    success: false,
+                    message: `ขออภัย สินค้า "${remoteProds[0].name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
+                  });
+                }
+              }
+            } catch (e) {}
+          } else {
+            const localProd = memoryProducts.find(p => String(p.id) === String(itm.id));
+            if (localProd) {
+              const currentStock = Number(localProd.stock) || 0;
+              if (currentStock < reqQty) {
+                return res.status(400).json({
+                  success: false,
+                  message: `ขออภัย สินค้า "${localProd.name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
+                });
+              }
+            }
+          }
+        }
+
         const orderId = "ORD-" + Date.now().toString().slice(-6);
         const orderRecord = {
           order_id: orderId,
           timestamp: new Date().toLocaleString("th-TH"),
-          student_name: body.student_name || "ไม่ระบุชื่อ",
+          student_name: customerName,
           student_class: body.student_class || "-",
           student_room: body.student_room || "-",
           student_no: body.student_no || "-",
-          phone: body.phone || "-",
+          phone: customerPhone,
           pickup_location: body.pickup_location || "-",
-          items_json: typeof body.items === "string" ? body.items : JSON.stringify(body.items || []),
+          items_json: typeof body.items === "string" ? body.items : JSON.stringify(rawItems),
           total_price: Number(body.total_price) || 0,
           payment_method: body.payment_method || "ชำระเงินปลายทาง (COD)",
           status: "รอดำเนินการ",
@@ -390,15 +632,14 @@ export default async function handler(req, res) {
         memoryOrders.unshift(orderRecord);
 
         // ตัดสต็อกใน in-memory
-        if (Array.isArray(body.items)) {
-          for (const itm of body.items) {
-            const prod = memoryProducts.find(p => String(p.id) === String(itm.id));
-            if (prod) {
-              prod.stock = Math.max(0, (Number(prod.stock) || 0) - (Number(itm.quantity) || 1));
-            }
+        for (const itm of rawItems) {
+          const prod = memoryProducts.find(p => String(p.id) === String(itm.id));
+          if (prod) {
+            prod.stock = Math.max(0, (Number(prod.stock) || 0) - (Number(itm.quantity) || 1));
           }
         }
 
+        // บันทึกและตัดสต็อกใน Supabase
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
             await supabaseRequest("orders", {
@@ -406,17 +647,15 @@ export default async function handler(req, res) {
               body: JSON.stringify(orderRecord)
             });
 
-            if (Array.isArray(body.items)) {
-              for (const item of body.items) {
-                const prods = await supabaseRequest(`products?id=eq.${item.id}`);
-                if (prods && prods.length > 0) {
-                  const currentStock = Number(prods[0].stock) || 0;
-                  const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
-                  await supabaseRequest(`products?id=eq.${item.id}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ stock: newStock })
-                  });
-                }
+            for (const item of rawItems) {
+              const prods = await supabaseRequest(`products?id=eq.${item.id}`);
+              if (prods && prods.length > 0) {
+                const currentStock = Number(prods[0].stock) || 0;
+                const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
+                await supabaseRequest(`products?id=eq.${item.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ stock: newStock })
+                });
               }
             }
           } catch (e) {
@@ -426,8 +665,8 @@ export default async function handler(req, res) {
 
         // แปลงรายการสินค้าให้อ่านง่ายในอีเมล
         let itemsText = "-";
-        if (Array.isArray(body.items)) {
-          itemsText = body.items.map(i => `${i.name} (x${i.quantity}) - ${Number(i.price) * Number(i.quantity)} บาท`).join("\n");
+        if (Array.isArray(rawItems)) {
+          itemsText = rawItems.map(i => `${i.name} (x${i.quantity}) - ${Number(i.price) * Number(i.quantity)} บาท`).join("\n");
         }
 
         // ส่งอีเมลแจ้งเตือนคุณครู / แอดมินทันที
@@ -460,8 +699,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, order_id: orderId, data: orderRecord });
       }
 
-      // 2. ปรับสถานะคำสั่งซื้อ
+      // =========================================================
+      // 2. ปรับสถานะคำสั่งซื้อ (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "updateOrderStatus") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const found = memoryOrders.find(o => o.order_id === body.order_id);
         if (found) found.status = body.status;
 
@@ -476,23 +721,59 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: "Order status updated" });
       }
 
-      // 3. สั่งจองล่วงหน้า (Create Pre-order)
+      // =========================================================
+      // 3. สั่งจองล่วงหน้า (Create Pre-order: Anti-Spam & Limit 10)
+      // =========================================================
       if (postAction === "createPreorder") {
+        const prodName = String(body.product_name || "").trim();
+        const custName = String(body.student_name || "").trim();
+        const custPhone = String(body.phone || "").trim();
+        const quantity = Number(body.quantity) || 1;
+
+        if (!prodName) {
+          return res.status(400).json({ success: false, message: "กรุณาระบุชื่อสินค้าที่ต้องการสั่งจอง" });
+        }
+        if (!custName) {
+          return res.status(400).json({ success: false, message: "กรุณาระบุชื่อ-นามสกุลผู้สั่งจอง" });
+        }
+        if (!custPhone || custPhone.length < 9) {
+          return res.status(400).json({ success: false, message: "กรุณาระบุเบอร์โทรศัพท์ติดต่อ (9-10 หลัก)" });
+        }
+        if (quantity < 1 || quantity > 10) {
+          return res.status(400).json({
+            success: false,
+            message: "ระบบจำกัดการสั่งจองสินค้าไม่เกิน 10 ชิ้นต่อ 1 รายการ"
+          });
+        }
+
+        // Anti-Spam Debounce (8 วินาที)
+        const spamKey = `preorder_${custPhone}_${prodName}`;
+        if (recentSubmissions.has(spamKey)) {
+          const prevTime = recentSubmissions.get(spamKey);
+          if (Date.now() - prevTime < 8000) {
+            return res.status(429).json({
+              success: false,
+              message: "ระบบกำลังประมวลผลรายการสั่งจองของคุณอยู่แล้ว กรุณารอสักครู่ครับ"
+            });
+          }
+        }
+        recentSubmissions.set(spamKey, Date.now());
+
         const preorderId = body.preorder_id || ("PRE-" + Date.now().toString().slice(-6));
         const preRecord = {
           preorder_id: preorderId,
           timestamp: new Date().toLocaleString("th-TH"),
-          student_name: body.student_name || "ไม่ระบุชื่อ",
+          student_name: custName,
           buyer_type: body.buyer_type || "นักเรียน",
           department: body.department || "-",
           student_class: body.student_class || "-",
           student_room: body.student_room || "-",
           student_no: body.student_no || "-",
-          phone: body.phone || "-",
+          phone: custPhone,
           notify_channel: body.notify_channel || "-",
           notify_account: body.notify_account || "-",
-          product_name: body.product_name || "-",
-          quantity: Number(body.quantity) || 1,
+          product_name: prodName,
+          quantity: quantity,
           pickup_location: body.pickup_location || "หมวดการงานอาชีพ",
           delivery_date: body.delivery_date || "รอคุณครูกำหนดวัน",
           status: "รอดำเนินการ",
@@ -542,8 +823,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, preorder_id: preorderId, data: preRecord });
       }
 
-      // 4. กำหนดวันรับของจองล่วงหน้า
+      // =========================================================
+      // 4. กำหนดวันรับของจองล่วงหน้า (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "setPreorderDeliveryDate") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const found = memoryPreorders.find(p => p.preorder_id === body.preorder_id);
         if (found) {
           found.delivery_date = body.delivery_date;
@@ -561,8 +848,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: "Delivery date set" });
       }
 
-      // 5. ปรับสถานะการจอง
+      // =========================================================
+      // 5. ปรับสถานะการจอง (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "updatePreorderStatus") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const found = memoryPreorders.find(p => p.preorder_id === body.preorder_id);
         if (found) found.status = body.status;
 
@@ -577,15 +870,35 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: "Preorder status updated" });
       }
 
-      // 6. เพิ่มสินค้า (Add Product)
+      // =========================================================
+      // 6. เพิ่มสินค้า (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "addProduct") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const name = String(body.name || "").trim();
+        const price = Number(body.price);
+        const stock = Number(body.stock);
+
+        if (!name || name.length < 2) {
+          return res.status(400).json({ success: false, message: "ชื่อสินค้าต้องมีความยาวอย่างน้อย 2 ตัวอักษร" });
+        }
+        if (isNaN(price) || price <= 0) {
+          return res.status(400).json({ success: false, message: "ราคาสินค้าต้องเป็นตัวเลขที่มากกว่า 0" });
+        }
+        if (isNaN(stock) || stock < 0) {
+          return res.status(400).json({ success: false, message: "จำนวนสต็อกต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป" });
+        }
+
         const prodId = body.id || ("P" + ("000" + (memoryProducts.length + 1)).slice(-3));
         const newProduct = {
           id: prodId,
-          name: body.name || "สินค้าใหม่",
+          name: name,
           category: body.category || "ทั่วไป",
-          price: Number(body.price) || 0,
-          stock: Number(body.stock) || 0,
+          price: price,
+          stock: stock,
           description: body.description || "",
           image_url: body.image_url || "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
           is_active: body.is_active !== undefined ? Boolean(body.is_active) : true
@@ -611,14 +924,34 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, id: prodId, data: newProduct });
       }
 
-      // 7. แก้ไขสินค้า (Update Product)
+      // =========================================================
+      // 7. แก้ไขสินค้า (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "updateProduct") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const prodId = body.id;
+        const name = String(body.name || "").trim();
+        const price = Number(body.price);
+        const stock = Number(body.stock);
+
+        if (!name) {
+          return res.status(400).json({ success: false, message: "ชื่อสินค้าไม่สามารถเว้นว่างได้" });
+        }
+        if (isNaN(price) || price <= 0) {
+          return res.status(400).json({ success: false, message: "ราคาสินค้าต้องมากกว่า 0" });
+        }
+        if (isNaN(stock) || stock < 0) {
+          return res.status(400).json({ success: false, message: "จำนวนสต็อกต้องไม่ติดลบ" });
+        }
+
         const updateData = {
-          name: body.name,
-          category: body.category,
-          price: Number(body.price) || 0,
-          stock: Number(body.stock) || 0,
+          name: name,
+          category: body.category || "ทั่วไป",
+          price: price,
+          stock: stock,
           description: body.description || "",
           image_url: body.image_url || ""
         };
@@ -639,8 +972,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: "Product updated", data: memoryProducts[idx] });
       }
 
-      // 8. ลบสินค้า (Delete Product)
+      // =========================================================
+      // 8. ลบสินค้า (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "deleteProduct") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const prodId = body.id || req.query.id;
         memoryProducts = memoryProducts.filter(p => String(p.id) !== String(prodId));
 
@@ -654,7 +993,9 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message: "Product deleted", id: prodId });
       }
 
-      // 9. ส่งข้อความสอบถาม
+      // =========================================================
+      // 9. ส่งข้อความสอบถาม (สาธารณะ)
+      // =========================================================
       if (postAction === "sendMessage") {
         const msgId = "MSG-" + Date.now().toString().slice(-6);
         const msgRecord = {
@@ -680,8 +1021,14 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, message_id: msgId, data: msgRecord });
       }
 
-      // 10. ตอบกลับข้อความ
+      // =========================================================
+      // 10. ตอบกลับข้อความ (เฉพาะผู้ขาย)
+      // =========================================================
       if (postAction === "replyMessage") {
+        if (!isValidSellerToken(req)) {
+          return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         const found = memoryMessages.find(m => m.message_id === body.message_id);
         if (found) {
           found.reply = body.reply;

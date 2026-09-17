@@ -400,8 +400,9 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label"><i class="fa-solid fa-hashtag"></i> จำนวนที่ต้องการจอง *</label>
-            <input type="number" id="preProdQty" class="form-input" min="1" value="1" required>
+            <label class="form-label"><i class="fa-solid fa-hashtag"></i> จำนวนที่ต้องการจอง (ไม่เกิน 10 ชิ้น) *</label>
+            <input type="number" id="preProdQty" class="form-input" min="1" max="10" value="1" required>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">* จำกัดการสั่งจองสูงสุดไม่เกิน 10 ชิ้นต่อรายการ</div>
           </div>
 
           <!-- 1. ชื่อ - นามสกุล (ไม่มีคำว่านักเรียน) -->
