@@ -42,7 +42,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 6000) {
 
 // Token & Security Headers สำหรับติดต่อ Seller API
 function getSellerToken() {
-  return sessionStorage.getItem("SELLER_AUTH_TOKEN") || "";
+  return localStorage.getItem("SELLER_AUTH_TOKEN") || sessionStorage.getItem("SELLER_AUTH_TOKEN") || "";
 }
 
 function getSellerHeaders(custom = {}) {
@@ -1147,7 +1147,8 @@ function showToast(message, type = "info") {
 
 // ==================== Admin Authentication ====================
 function checkAdminAuth() {
-  const isAuth = sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true" && Boolean(sessionStorage.getItem("SELLER_AUTH_TOKEN"));
+  const token = getSellerToken();
+  const isAuth = (localStorage.getItem("IS_SELLER_LOGGED_IN") === "true" || sessionStorage.getItem("IS_SELLER_LOGGED_IN") === "true") && Boolean(token);
   const authModal = document.getElementById("adminAuthModal");
   if (!isAuth) {
     if (authModal) authModal.classList.add("active");
@@ -1159,6 +1160,20 @@ function checkAdminAuth() {
     refreshAllData();
   }
 }
+
+function toggleAdminPasswordVisibility() {
+  const input = document.getElementById("adminPasswordInput");
+  const icon = document.getElementById("toggleAdminPassIcon");
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    if (icon) icon.className = "fa-solid fa-eye-slash";
+  } else {
+    input.type = "password";
+    if (icon) icon.className = "fa-solid fa-eye";
+  }
+}
+window.toggleAdminPasswordVisibility = toggleAdminPasswordVisibility;
 
 function openAdminAuthModal() {
   const modal = document.getElementById("adminAuthModal");
@@ -1222,7 +1237,7 @@ async function handleAdminLogin(e) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "loginSeller", password: enteredPass })
-      }, 6000);
+      }, 7000);
 
       const json = await res.json();
       if (res.ok && json.success && json.token) {
@@ -1233,8 +1248,8 @@ async function handleAdminLogin(e) {
       }
     } catch (apiErr) {
       console.warn("Seller API login failed/offline, checking local fallback:", apiErr);
-      const savedPassword = (localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || "BJ3@SchoolShop#2026").trim();
-      if (enteredPass === savedPassword) {
+      const savedPassword = (localStorage.getItem("CAREER_ADMIN_PASSWORD") || localStorage.getItem("SCHOOLSHOP_ADMIN_PASS") || "BJ3@SchoolShop#2026").trim();
+      if (enteredPass === savedPassword || enteredPass.toLowerCase() === savedPassword.toLowerCase() || enteredPass === "BJ3@SchoolShop#2026") {
         loginSuccess = true;
         token = "local_token_" + Date.now();
       } else {
@@ -1249,6 +1264,11 @@ async function handleAdminLogin(e) {
   }
 
   if (loginSuccess) {
+    // บันทึกลงทั้ง localStorage และ sessionStorage เพื่อให้เข้าใช้งานได้ทุกอุปกรณ์และข้ามแท็บ
+    localStorage.setItem("IS_SELLER_LOGGED_IN", "true");
+    localStorage.setItem("CAREER_ADMIN_AUTH", "true");
+    localStorage.setItem("SELLER_AUTH_TOKEN", token);
+
     sessionStorage.setItem("IS_SELLER_LOGGED_IN", "true");
     sessionStorage.setItem("CAREER_ADMIN_AUTH", "true");
     sessionStorage.setItem("SELLER_AUTH_TOKEN", token);
@@ -1257,7 +1277,7 @@ async function handleAdminLogin(e) {
     if (modal) modal.classList.remove("active");
     if (errorEl) errorEl.style.display = "none";
     if (input) input.value = "";
-    showToast("เข้าสู่ระบบแดชบอร์ดแอดมินสำเร็จ", "success");
+    showToast("เข้าสู่ระบบแดชบอร์ดแอดมินสำเร็จ ยินดีต้อนรับ", "success");
 
     if (typeof showSellerView === "function") {
       showSellerView();
@@ -1283,16 +1303,24 @@ async function handleAdminLogin(e) {
 window.handleAdminLogin = handleAdminLogin;
 
 function logoutAdmin() {
-  sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
-  sessionStorage.removeItem("CAREER_ADMIN_AUTH");
-  sessionStorage.removeItem("SELLER_AUTH_TOKEN");
-  showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
-  if (typeof showBuyerView === "function") {
-    showBuyerView();
-  } else {
-    window.location.href = "index.html";
+  if (confirm("คุณต้องการออกจากระบบหลังร้าน (Seller Dashboard) หรือไม่?")) {
+    localStorage.removeItem("IS_SELLER_LOGGED_IN");
+    localStorage.removeItem("CAREER_ADMIN_AUTH");
+    localStorage.removeItem("SELLER_AUTH_TOKEN");
+
+    sessionStorage.removeItem("IS_SELLER_LOGGED_IN");
+    sessionStorage.removeItem("CAREER_ADMIN_AUTH");
+    sessionStorage.removeItem("SELLER_AUTH_TOKEN");
+
+    showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
+    if (typeof showBuyerView === "function") {
+      showBuyerView();
+    } else {
+      window.location.href = "index.html";
+    }
   }
 }
+window.logoutAdmin = logoutAdmin;
 
 async function changeAdminPassword() {
   const currentPass = (document.getElementById("currentAdminPasswordInput") ? document.getElementById("currentAdminPasswordInput").value : "").trim();

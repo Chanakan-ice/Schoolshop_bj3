@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -535,17 +535,25 @@
         </p>
         <form id="adminAuthForm" onsubmit="handleAdminLogin(event)">
           <div class="form-group">
-            <label class="form-label"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
-            <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านผู้ดูแลระบบ" autofocus required>
+            <label class="form-label" for="adminPasswordInput"><i class="fa-solid fa-key"></i> รหัสผ่านผู้ดูแลระบบ</label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="password" id="adminPasswordInput" class="form-input" placeholder="กรอกรหัสผ่านผู้ดูแลระบบ" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required style="padding-right: 2.75rem; font-size: 16px;">
+              <button type="button" onclick="toggleAdminPasswordVisibility()" style="position: absolute; right: 0.65rem; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.4rem; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;" title="แสดง/ซ่อนรหัสผ่าน">
+                <i class="fa-solid fa-eye" id="toggleAdminPassIcon"></i>
+              </button>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.4rem;">
+              <i class="fa-solid fa-circle-info"></i> รหัสเริ่มต้น: <strong style="color: var(--primary);">BJ3@SchoolShop#2026</strong>
+            </div>
           </div>
-          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem; display: none;">
+          <div id="authErrorMsg" style="color: var(--danger); font-size: 0.85rem; margin-top: -0.25rem; margin-bottom: 1rem; display: none;">
             <i class="fa-solid fa-circle-exclamation"></i> รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง
           </div>
           <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-            <button type="submit" class="btn btn-primary btn-block">
+            <button type="submit" class="btn btn-primary btn-block" style="min-height: 46px; font-size: 1rem;">
               <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบแดชบอร์ด
             </button>
-            <a href="index.html" class="btn btn-secondary btn-block">
+            <a href="index.html" class="btn btn-secondary btn-block" style="min-height: 42px; display: inline-flex; align-items: center; justify-content: center;">
               <i class="fa-solid fa-arrow-left"></i> กลับหน้าร้านค้าสำหรับสั่งซื้อสินค้า
             </a>
           </div>

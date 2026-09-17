@@ -316,7 +316,7 @@ function renderProducts() {
               </div>
             </div>
             
-            <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <div class="card-actions-wrap" style="display: flex; gap: 0.35rem; align-items: center;">
               ${isOutOfStock ? `
                 <button class="add-cart-btn preorder-card-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
                   <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
