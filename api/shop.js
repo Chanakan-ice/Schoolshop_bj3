@@ -310,6 +310,12 @@ export default async function handler(req, res) {
     return;
   }
 
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch (_) {}
+  }
+  body = body || {};
+
   const clientSbUrl = req.headers["x-supabase-url"] || (req.query && req.query.supabase_url) || body.supabase_url;
   const clientSbKey = req.headers["x-supabase-key"] || (req.query && req.query.supabase_key) || body.supabase_key;
   const clientResendKey = req.headers["x-resend-key"] || (req.query && req.query.resend_key) || body.resend_key;
@@ -322,12 +328,6 @@ export default async function handler(req, res) {
   const SUPABASE_URL = clientSbUrl || globalSupabaseUrl || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const SUPABASE_KEY = clientSbKey || globalSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const RESEND_KEY = clientResendKey || process.env.RESEND_API_KEY;
-
-  let body = req.body;
-  if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch (_) {}
-  }
-  body = body || {};
 
   const action = req.query.action || body.action;
 
