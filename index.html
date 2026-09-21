@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>ร้านค้าหมวดการงานอาชีพ | Career & Occupations Shop</title>
-  <link rel="stylesheet" href="styles.css?v=4.0">
+  <link rel="stylesheet" href="styles.css?v=4.2">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -207,6 +207,21 @@
 
         <form id="orderForm" onsubmit="handleOrderSubmit(event)">
           
+          <!-- แสดงสรุปรายการสินค้าที่สั่งซื้อชัดเจน (ป้องกันการเข้าใจผิดเรื่องสินค้าที่สั่ง) -->
+          <div id="checkoutSummaryBox" style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem;">
+            <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-bag-shopping" style="color: var(--primary);"></i> สินค้าที่กำลังสั่งซื้อ:</span>
+              <span id="checkoutSummaryCount" style="font-size: 0.85rem; color: var(--text-muted);">1 รายการ</span>
+            </div>
+            <div id="checkoutItemsList" style="max-height: 180px; overflow-y: auto; margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+              <!-- dynamically injected by renderCheckoutSummary() -->
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #94a3b8; padding-top: 0.65rem; font-weight: 700; color: #0f172a;">
+              <span>ยอดเงินรวมที่ต้องชำระ (COD):</span>
+              <span id="checkoutSummaryTotal" style="font-size: 1.25rem; color: var(--primary-dark);">0 ฿</span>
+            </div>
+          </div>
+
           <!-- 1. ชื่อ - นามสกุล (ไม่มีคำว่านักเรียน) -->
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-user"></i> ชื่อ - นามสกุล *</label>
@@ -751,6 +766,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js?v=4.1"></script>
+  <script src="app.js?v=4.2"></script>
 </body>
 </html>

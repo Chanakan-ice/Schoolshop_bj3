@@ -337,6 +337,34 @@ async function refreshAllData() {
   updateMetrics();
 }
 
+function sortDescendingByTime(list, idKey = "order_id") {
+  return list.sort((a, b) => {
+    // 1. ISO date: created_at
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+
+    // 2. Thai timestamp string: "16/9/2569 17:04:50"
+    const parseTime = (str) => {
+      if (!str) return 0;
+      const m = String(str).match(/(\d+)[/.-](\d+)[/.-](\d+)[,\s]+(\d+):(\d+):?(\d+)?/);
+      if (m) {
+        let d = parseInt(m[1]), mo = parseInt(m[2]) - 1, y = parseInt(m[3]);
+        if (y > 2500) y -= 543;
+        return new Date(y, mo, d, parseInt(m[4]) || 0, parseInt(m[5]) || 0, parseInt(m[6]) || 0).getTime();
+      }
+      const t = Date.parse(str);
+      return isNaN(t) ? 0 : t;
+    };
+    const tA = parseTime(a.timestamp);
+    const tB = parseTime(b.timestamp);
+    if (tA && tB && tA !== tB) return tB - tA;
+
+    // 3. ID descending (ORD-xxxx or PRE-xxxx)
+    return String(b[idKey] || "").localeCompare(String(a[idKey] || ""), undefined, { numeric: true });
+  });
+}
+
 // 1. Orders
 async function loadOrders() {
   let apiOrders = [];
@@ -384,7 +412,7 @@ async function loadOrders() {
     }
   });
 
-  allOrders = Array.from(map.values());
+  allOrders = sortDescendingByTime(Array.from(map.values()), "order_id");
   renderOrdersTable(allOrders);
 }
 
@@ -654,7 +682,7 @@ async function loadPreorders() {
     }
   });
 
-  allPreorders = Array.from(map.values());
+  allPreorders = sortDescendingByTime(Array.from(map.values()), "preorder_id");
   renderPreordersTable();
   updatePreorderBadge();
 }

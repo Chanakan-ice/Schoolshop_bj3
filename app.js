@@ -420,14 +420,18 @@ function renderProducts() {
                   <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
                 </button>
               ` : `
-                <button class="card-preorder-icon-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')" title="สั่งจองล่วงหน้ารายการนี้">
-                  <i class="fa-solid fa-calendar-plus"></i> จอง
+                <button class="add-cart-btn buy-now-card-btn" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #ffffff; padding: 0.45rem 0.75rem; font-weight: 600;" onclick="event.stopPropagation(); quickBuy('${safeId}')" title="สั่งซื้อสินค้านี้ทันที (COD)">
+                  <i class="fa-solid fa-bolt"></i> สั่งซื้อ
                 </button>
-                <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${safeId}')">
-                  <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
+                <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${safeId}')" title="เพิ่มสินค้าลงในตะกร้า">
+                  <i class="fa-solid fa-cart-plus"></i> ตะกร้า
+                </button>
+                <button class="card-preorder-icon-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')" title="สั่งจองล่วงหน้ารายการนี้">
+                  <i class="fa-solid fa-calendar-plus"></i>
                 </button>
               `}
             </div>
+          </div>
         </div>
       </div>
     `;
@@ -608,8 +612,37 @@ function addCurrentProductToCart(productId) {
   showToast(`เพิ่ม "${prod.name}" (${qty} ชิ้น) ลงในตะกร้าแล้ว`, "success");
 }
 
+function quickBuy(productId) {
+  const cleanId = decodeURIComponent(String(productId || "").trim());
+  const prod = products.find(p => String(p.id) === cleanId) || getInitialProducts().find(p => String(p.id) === cleanId);
+  if (!prod) {
+    showToast("ไม่พบข้อมูลสินค้า", "error");
+    return;
+  }
+
+  const stock = Number(prod.stock) || 0;
+  if (stock <= 0) {
+    showToast(`สินค้า "${prod.name}" หมดชั่วคราว`, "warning");
+    openPreorderForProduct(prod.name);
+    return;
+  }
+
+  const buyNowItem = [{
+    id: prod.id,
+    name: prod.name,
+    price: Number(prod.price),
+    quantity: 1,
+    image_url: prod.image_url
+  }];
+
+  isBuyNowFlow = true;
+  openCheckoutModal(buyNowItem);
+}
+window.quickBuy = quickBuy;
+
 function buyNowCurrentProduct(productId) {
-  const prod = products.find(p => String(p.id) === String(productId));
+  const cleanId = decodeURIComponent(String(productId || "").trim());
+  const prod = products.find(p => String(p.id) === cleanId) || getInitialProducts().find(p => String(p.id) === cleanId);
   if (!prod) return;
 
   const qtyInput = document.getElementById("detailQtyInput");
@@ -627,15 +660,6 @@ function buyNowCurrentProduct(productId) {
     quantity: qty,
     image_url: prod.image_url
   }];
-
-  const current = getCurrentCustomer();
-  if (!current) {
-    pendingCheckoutItems = buyNowItem;
-    isBuyNowFlow = true;
-    showToast("กรุณาเข้าสู่ระบบหรือสมัครสมาชิกเพื่อทำการสั่งซื้อครับ", "info");
-    openCustomerAuthModal('login');
-    return;
-  }
 
   isBuyNowFlow = true;
   openCheckoutModal(buyNowItem);
@@ -1351,6 +1375,32 @@ function syncTeacherLocation(dept, isPreorder = false) {
   }
 }
 
+function renderCheckoutSummary(items) {
+  const container = document.getElementById("checkoutItemsList");
+  const countEl = document.getElementById("checkoutSummaryCount");
+  const totalEl = document.getElementById("checkoutSummaryTotal");
+  if (!container) return;
+
+  const total = items.reduce((sum, itm) => sum + (Number(itm.price) * Number(itm.quantity)), 0);
+  const totalQty = items.reduce((sum, itm) => sum + Number(itm.quantity), 0);
+
+  if (countEl) countEl.innerText = `${totalQty} ชิ้น (${items.length} รายการ)`;
+  if (totalEl) totalEl.innerText = `${total.toLocaleString()} ฿`;
+
+  container.innerHTML = items.map(itm => `
+    <div style="display: flex; align-items: center; gap: 0.75rem; background: #ffffff; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+      <img src="${itm.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="${itm.name}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0;" onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 600; font-size: 0.9rem; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${itm.name}</div>
+        <div style="font-size: 0.8rem; color: #64748b;">${Number(itm.price).toLocaleString()} ฿ x ${itm.quantity} ชิ้น</div>
+      </div>
+      <div style="font-weight: 700; color: var(--primary-dark); font-size: 0.95rem; white-space: nowrap;">
+        ${(Number(itm.price) * Number(itm.quantity)).toLocaleString()} ฿
+      </div>
+    </div>
+  `).join("");
+}
+
 function openCheckoutModal(customItems = null) {
   let itemsToCheckout = [];
   if (customItems && Array.isArray(customItems) && customItems.length > 0) {
@@ -1382,6 +1432,9 @@ function openCheckoutModal(customItems = null) {
   }
 
   activeCheckoutItems = itemsToCheckout;
+
+  // เรนเดอร์รายการสินค้าที่จะสั่งซื้อให้เห็นชัดเจนในหน้าต่างสั่งซื้อ
+  renderCheckoutSummary(itemsToCheckout);
 
   closeCartModal();
   autoFillCustomerData();
@@ -1534,6 +1587,24 @@ async function handleOrderSubmit(e) {
           body: JSON.stringify(orderRecord)
         });
         isSavedToRemote = true;
+
+        // ตัดสต็อกใน Supabase ทันทีสำหรับทุกสินค้าที่ถูกสั่งซื้อ (Real-time Stock Deduction)
+        for (const item of orderItems) {
+          try {
+            const remoteP = await supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`);
+            if (Array.isArray(remoteP) && remoteP.length > 0) {
+              const curStock = Number(remoteP[0].stock) || 0;
+              const nextStock = Math.max(0, curStock - (Number(item.quantity) || 1));
+              await supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`, {
+                method: "PATCH",
+                body: JSON.stringify({ stock: nextStock })
+              });
+              console.log(`ตัดสต็อก Supabase: ${item.name} (${item.id}) จาก ${curStock} เหลือ ${nextStock} ชิ้น`);
+            }
+          } catch (stkErr) {
+            console.warn(`ตัดสต็อก Supabase สินค้า ${item.id} ขัดข้อง:`, stkErr);
+          }
+        }
       } catch (sbOrderErr) {
         console.warn("Supabase direct order insert failed, trying API:", sbOrderErr);
       }
@@ -1612,10 +1683,17 @@ async function handleOrderSubmit(e) {
     localOrders.unshift(newLocalOrder);
     localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(localOrders));
 
-    // ตัดสต็อกใน Local
+    // ตัดสต็อกใน Local & Custom Products
     orderItems.forEach(c => {
       const p = products.find(prod => String(prod.id) === String(c.id));
       if (p) p.stock = Math.max(0, (Number(p.stock) || 0) - c.quantity);
+
+      const customList = getCustomProducts();
+      const cp = customList.find(prod => String(prod.id) === String(c.id));
+      if (cp) {
+        cp.stock = Math.max(0, (Number(cp.stock) || 0) - c.quantity);
+        saveCustomProducts(customList);
+      }
     });
     localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
     renderProducts();
