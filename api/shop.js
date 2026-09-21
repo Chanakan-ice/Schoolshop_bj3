@@ -85,6 +85,19 @@ const activeSellerTokens = new Map(); // token -> { expiresAt, ip }
 const recentSubmissions = new Map();  // key -> timestamp
 const loginFailures = new Map();      // ip -> { count, lockedUntil }
 
+function getBangkokDateTime() {
+  return new Date().toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+}
+
 function isPasswordValid(inputPassword) {
   if (!inputPassword) return false;
   const p = String(inputPassword).trim();
@@ -706,7 +719,7 @@ export default async function handler(req, res) {
         const orderId = "ORD-" + Date.now().toString().slice(-6);
         const orderRecord = {
           order_id: orderId,
-          timestamp: new Date().toLocaleString("th-TH"),
+          timestamp: body.timestamp || getBangkokDateTime(),
           student_name: customerName,
           student_class: body.student_class || "-",
           student_room: body.student_room || "-",
@@ -853,7 +866,7 @@ export default async function handler(req, res) {
         const preorderId = body.preorder_id || ("PRE-" + Date.now().toString().slice(-6));
         const preRecord = {
           preorder_id: preorderId,
-          timestamp: new Date().toLocaleString("th-TH"),
+          timestamp: body.timestamp || getBangkokDateTime(),
           student_name: custName,
           buyer_type: body.buyer_type || "นักเรียน",
           department: body.department || "-",

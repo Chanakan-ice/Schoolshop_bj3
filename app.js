@@ -48,6 +48,19 @@ let isSubmittingPreorder = false;
 const DEFAULT_SUPABASE_URL = "https://ztxihwioqkekkfokdhew.supabase.co";
 const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
 
+function getBangkokDateTime() {
+  return new Date().toLocaleString("th-TH", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+}
+
 function normalizeSupabaseUrl(input) {
   if (!input) return "";
   let clean = input.trim();
@@ -1560,6 +1573,8 @@ async function handleOrderSubmit(e) {
 
   try {
     let orderId = "ORD-" + Date.now().toString().slice(-6);
+    const orderTime = getBangkokDateTime();
+    orderData.timestamp = orderTime;
     
     // 1. ลองบันทึกลง Supabase โดยตรงหากมีการตั้งค่า
     const sbConfig = getSupabaseConfig();
@@ -1569,7 +1584,7 @@ async function handleOrderSubmit(e) {
       try {
         const orderRecord = {
           order_id: orderId,
-          timestamp: new Date().toLocaleString("th-TH"),
+          timestamp: orderTime,
           student_name: orderData.student_name,
           student_class: orderData.student_class,
           student_room: orderData.student_room,
@@ -1676,7 +1691,7 @@ async function handleOrderSubmit(e) {
     const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
     const newLocalOrder = {
       order_id: orderId,
-      timestamp: new Date().toLocaleString("th-TH"),
+      timestamp: orderTime,
       ...orderData,
       status: "รอดำเนินการ"
     };
@@ -2000,6 +2015,41 @@ async function handlePreorderSubmit(e) {
     };
 
     let preId = "PRE-" + Date.now().toString().slice(-6);
+    const preTime = getBangkokDateTime();
+    data.timestamp = preTime;
+
+    // บันทึกลง Supabase โดยตรงทันทีหากเชื่อมต่อไว้
+    const sbConfig = getSupabaseConfig();
+    if (sbConfig) {
+      try {
+        await supabaseFetch("preorders", {
+          method: "POST",
+          body: JSON.stringify({
+            preorder_id: preId,
+            timestamp: preTime,
+            student_name: data.student_name,
+            buyer_type: data.buyer_type,
+            department: data.department || "-",
+            student_class: data.student_class || "-",
+            student_room: data.student_room || "-",
+            student_no: data.student_no || "-",
+            phone: data.phone,
+            pickup_location: data.pickup_location || "หมวดการงานอาชีพ",
+            notify_channel: data.notify_channel,
+            notify_account: data.notify_account,
+            product_name: data.product_name,
+            quantity: Number(data.quantity) || 1,
+            delivery_date: data.delivery_date || "รอคุณครูกำหนดวัน",
+            status: "รอดำเนินการ",
+            note: data.note || ""
+          })
+        });
+        console.log("Preorder saved directly to Supabase:", preId);
+      } catch (sbPreErr) {
+        console.warn("Supabase direct preorder insert error:", sbPreErr);
+      }
+    }
+
     const targetApiUrl = getActiveApiUrl();
     let preorderSentViaApi = false;
 
@@ -2042,6 +2092,7 @@ async function handlePreorderSubmit(e) {
             _captcha: "false",
             "ประเภทรายการ": "รายการสั่งจองสินค้าล่วงหน้า (Pre-order)",
             "รหัสการสั่งจอง": preId,
+            "เวลาที่สั่งจอง": preTime,
             "ผู้สั่งจอง": `${data.student_name} (${data.buyer_type})`,
             "เบอร์โทรติดต่อ": data.phone,
             "สินค้าที่สั่งจอง": data.product_name,
@@ -2058,7 +2109,7 @@ async function handlePreorderSubmit(e) {
     const preorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
     preorders.unshift({
       preorder_id: preId,
-      timestamp: new Date().toLocaleString("th-TH"),
+      timestamp: preTime,
       ...data,
       status: "รอดำเนินการ (รอครูกำหนดวัน)"
     });

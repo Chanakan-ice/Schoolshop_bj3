@@ -365,6 +365,27 @@ function sortDescendingByTime(list, idKey = "order_id") {
   });
 }
 
+function formatThaiDateTime(dateVal, fallback = "-") {
+  if (dateVal) {
+    try {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString("th-TH", {
+          timeZone: "Asia/Bangkok",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        });
+      }
+    } catch (_) {}
+  }
+  return fallback || "-";
+}
+
 // 1. Orders
 async function loadOrders() {
   let apiOrders = [];
@@ -458,7 +479,7 @@ function renderOrdersTable(ordersToDisplay) {
     return `
       <tr>
         <td><strong>${order.order_id || '-'}</strong></td>
-        <td style="font-size: 0.8rem; color: var(--text-muted);">${order.timestamp || order.date || '-'}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${formatThaiDateTime(order.created_at, order.timestamp || order.date)}</td>
         <td>
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
             ${buyerBadge}
@@ -739,7 +760,7 @@ function renderPreordersTable() {
     return `
       <tr style="${isDue ? 'background-color: #fffbeb;' : ''}">
         <td><strong>${pre.preorder_id || '-'}</strong></td>
-        <td style="font-size: 0.8rem; color: var(--text-muted);">${pre.timestamp || '-'}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${formatThaiDateTime(pre.created_at, pre.timestamp)}</td>
         <td>
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
             ${buyerBadge}
