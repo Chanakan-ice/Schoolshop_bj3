@@ -1,18 +1,9 @@
 {
-  "version": 2,
-  "cleanUrls": true,
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/seller",
-      "dest": "/seller.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
-    }
-  ]
+    "rewrites":  [
+                     {
+                         "destination":  "/seller.html",
+                         "source":  "/seller"
+                     }
+                 ],
+    "cleanUrls":  true
 }
