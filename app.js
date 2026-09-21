@@ -630,7 +630,13 @@ function addCurrentProductToCart(productId) {
   showToast(`เพิ่ม "${prod.name}" (${qty} ชิ้น) ลงในตะกร้าแล้ว`, "success");
 }
 
+let isOpeningCheckoutModal = false;
+
 function quickBuy(productId) {
+  if (isOpeningCheckoutModal) return;
+  isOpeningCheckoutModal = true;
+  setTimeout(() => { isOpeningCheckoutModal = false; }, 800);
+
   const cleanId = decodeURIComponent(String(productId || "").trim());
   const prod = products.find(p => String(p.id) === cleanId) || getInitialProducts().find(p => String(p.id) === cleanId);
   if (!prod) {
@@ -659,6 +665,10 @@ function quickBuy(productId) {
 window.quickBuy = quickBuy;
 
 function buyNowCurrentProduct(productId) {
+  if (isOpeningCheckoutModal) return;
+  isOpeningCheckoutModal = true;
+  setTimeout(() => { isOpeningCheckoutModal = false; }, 800);
+
   const cleanId = decodeURIComponent(String(productId || "").trim());
   const prod = products.find(p => String(p.id) === cleanId) || getInitialProducts().find(p => String(p.id) === cleanId);
   if (!prod) return;
@@ -1318,6 +1328,9 @@ function renderCartModal() {
 
 // ==================== Checkout & COD Order Submission ====================
 function proceedToCheckout() {
+  if (isOpeningCheckoutModal) return;
+  isOpeningCheckoutModal = true;
+  setTimeout(() => { isOpeningCheckoutModal = false; }, 800);
   openCheckoutModal();
 }
 window.proceedToCheckout = proceedToCheckout;
@@ -1470,13 +1483,35 @@ function closeCheckoutModal() {
 
 async function handleOrderSubmit(e) {
   e.preventDefault();
-  if (isSubmittingOrder) return;
+  if (isSubmittingOrder) {
+    console.warn("ระบบกำลังประมวลผลคำสั่งซื้อ กรุณารอสักครู่");
+    return;
+  }
   isSubmittingOrder = true;
 
   const submitBtn = document.getElementById("submitOrderBtn");
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกคำสั่งซื้อ...';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.style.pointerEvents = "none";
+    submitBtn.style.opacity = "0.7";
+    submitBtn.style.cursor = "not-allowed";
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกคำสั่งซื้อ... กรุณารอสักครู่';
+  }
 
+  const resetSubmitBtn = () => {
+    isSubmittingOrder = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.style.pointerEvents = "auto";
+      submitBtn.style.opacity = "1";
+      submitBtn.style.cursor = "pointer";
+      submitBtn.style.background = "";
+      submitBtn.style.borderColor = "";
+      submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    }
+  };
+
+  let orderSucceeded = false;
   const buyerType = (document.getElementById("custBuyerType") && document.getElementById("custBuyerType").value) || "student";
   const isTeacher = buyerType === "teacher";
   const name = (document.getElementById("custName") ? document.getElementById("custName").value : "").trim();
@@ -1485,9 +1520,7 @@ async function handleOrderSubmit(e) {
 
   if (!name || name.length < 2) {
     showToast("กรุณากรอกชื่อ-นามสกุลจริง (อย่างน้อย 2 ตัวอักษร)", "error");
-    isSubmittingOrder = false;
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    resetSubmitBtn();
     return;
   }
 
@@ -1495,18 +1528,14 @@ async function handleOrderSubmit(e) {
   const phoneRegex = /^0[0-9]{8,9}$/;
   if (!phoneRegex.test(phoneClean)) {
     showToast("กรุณากรอกเบอร์โทรศัพท์ที่ถูกต้อง (ขึ้นต้นด้วย 0 และมี 9-10 หลัก)", "error");
-    isSubmittingOrder = false;
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    resetSubmitBtn();
     return;
   }
 
   const orderItems = (activeCheckoutItems && activeCheckoutItems.length > 0) ? activeCheckoutItems : cart;
   if (!orderItems || orderItems.length === 0) {
     showToast("ไม่มีสินค้าในรายการสั่งซื้อ", "error");
-    isSubmittingOrder = false;
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    resetSubmitBtn();
     return;
   }
 
@@ -1515,9 +1544,7 @@ async function handleOrderSubmit(e) {
     const p = products.find(prod => String(prod.id) === String(itm.id));
     if (p && Number(p.stock) < Number(itm.quantity)) {
       showToast(`ขออภัย สินค้า "${p.name}" เหลือเพียง ${p.stock} ชิ้น ไม่พอสำหรับจำนวนที่สั่ง (${itm.quantity} ชิ้น)`, "error");
-      isSubmittingOrder = false;
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+      resetSubmitBtn();
       return;
     }
   }
@@ -1560,8 +1587,7 @@ async function handleOrderSubmit(e) {
 
     if (!sRoom) {
       showToast("กรุณากรอกเลขห้องของนักเรียนครับ", "error");
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+      resetSubmitBtn();
       return;
     }
 
@@ -1731,6 +1757,17 @@ async function handleOrderSubmit(e) {
     }
     activeCheckoutItems = null;
     isBuyNowFlow = false;
+
+    // เปลี่ยนปุ่มเป็นสถานะสำเร็จ และล็อกปุ่มไว้ป้องกันการกดย้ำ
+    orderSucceeded = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.style.pointerEvents = "none";
+      submitBtn.style.background = "#10b981";
+      submitBtn.style.borderColor = "#10b981";
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> สั่งซื้อสำเร็จแล้ว!';
+    }
+
     closeCheckoutModal();
 
     showToast(`สั่งซื้อสำเร็จ! รหัสคำสั่งซื้อ: ${orderId}`, "success");
@@ -1740,9 +1777,15 @@ async function handleOrderSubmit(e) {
     console.error("Order error:", error);
     showToast("เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
   } finally {
-    isSubmittingOrder = false;
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+    if (!orderSucceeded) {
+      // หากเกิดข้อผิดพลาด ให้ปลดล็อกปุ่มให้แก้ไขและกดใหม่ได้
+      resetSubmitBtn();
+    } else {
+      // หากสั่งซื้อสำเร็จแล้ว ล็อกปุ่มค้างไว้ 3 วินาทีเพื่อป้องกันการกดเบิ้ลซ้ำซ้อน 100%
+      setTimeout(() => {
+        resetSubmitBtn();
+      }, 3000);
+    }
   }
 }
 
@@ -1923,12 +1966,35 @@ function handleNotifyChannelChange() {
 
 async function handlePreorderSubmit(e) {
   e.preventDefault();
-  if (isSubmittingPreorder) return;
+  if (isSubmittingPreorder) {
+    console.warn("ระบบกำลังประมวลผลการสั่งจอง กรุณารอสักครู่");
+    return;
+  }
   isSubmittingPreorder = true;
 
   const submitBtn = document.getElementById("submitPreorderBtn");
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกการจอง...';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.style.pointerEvents = "none";
+    submitBtn.style.opacity = "0.7";
+    submitBtn.style.cursor = "not-allowed";
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกการจอง... กรุณารอสักครู่';
+  }
+
+  const resetPreorderBtn = () => {
+    isSubmittingPreorder = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.style.pointerEvents = "auto";
+      submitBtn.style.opacity = "1";
+      submitBtn.style.cursor = "pointer";
+      submitBtn.style.background = "";
+      submitBtn.style.borderColor = "";
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    }
+  };
+
+  let preorderSucceeded = false;
 
   try {
     const prodName = document.getElementById("preProdName").value.trim();
@@ -2123,6 +2189,15 @@ async function handlePreorderSubmit(e) {
     });
     localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(preorders));
 
+    preorderSucceeded = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.style.pointerEvents = "none";
+      submitBtn.style.background = "#10b981";
+      submitBtn.style.borderColor = "#10b981";
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> บันทึกการจองสำเร็จแล้ว!';
+    }
+
     closePreorderModal();
     document.getElementById("preorderForm").reset();
     showToast(`สั่งจองสำเร็จ! รหัสการจอง: ${preId}`, "success");
@@ -2132,9 +2207,13 @@ async function handlePreorderSubmit(e) {
     console.error("Preorder submission error:", err);
     showToast("เกิดข้อผิดพลาดในการสั่งจอง กรุณาลองใหม่อีกครั้ง", "error");
   } finally {
-    isSubmittingPreorder = false;
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> ส่งรายการสั่งจอง';
+    if (!preorderSucceeded) {
+      resetPreorderBtn();
+    } else {
+      setTimeout(() => {
+        resetPreorderBtn();
+      }, 3000);
+    }
   }
 }
 
