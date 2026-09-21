@@ -410,27 +410,31 @@ function renderProducts() {
     const safeId = encodeURIComponent(String(item.id));
 
     return `
-      <div class="product-card" data-product-id="${safeId}" onclick="viewProductDetail('${safeId}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียดและสั่งซื้อ">
+      <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" data-product-id="${safeId}" onclick="viewProductDetail('${safeId}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียด">
         <div class="product-image-wrap">
-          <img src="${item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="${item.name}" class="product-img" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
-          <span class="product-badge">${item.category || 'ทั่วไป'}</span>
+          <img src="${item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="${item.name}" class="product-img" style="${isOutOfStock ? 'filter: grayscale(30%); opacity: 0.88;' : ''}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
+          ${isOutOfStock 
+            ? `<span class="product-badge" style="background: #ef4444; color: #ffffff; font-weight: 700; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);"><i class="fa-solid fa-circle-xmark"></i> สินค้าหมด</span>` 
+            : `<span class="product-badge">${item.category || 'ทั่วไป'}</span>`}
         </div>
         <div class="product-body">
           <h3 class="product-title">${item.name}</h3>
           <p class="product-desc">${item.description || '-'}</p>
           
-          <div class="product-footer">
-            <div>
+          <div class="product-footer" style="${isOutOfStock ? 'flex-direction: column; align-items: stretch; gap: 0.65rem;' : ''}">
+            <div style="${isOutOfStock ? 'display: flex; justify-content: space-between; align-items: center;' : ''}">
               <div class="product-price">${Number(item.price).toLocaleString()} <span>฿</span></div>
               <div class="stock-tag ${isLowStock ? 'low' : ''}">
-                ${isOutOfStock ? '<span style="color: #d97706; font-weight: 600;"><i class="fa-solid fa-clock"></i> สินค้าหมด (เปิดรับจอง)</span>' : `คงเหลือ: ${stock} ชิ้น`}
+                ${isOutOfStock 
+                  ? '<span style="color: #ef4444; font-weight: 700; background: #fee2e2; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.3rem;"><i class="fa-solid fa-circle-xmark"></i> สินค้าหมด</span>' 
+                  : `คงเหลือ: ${stock} ชิ้น`}
               </div>
             </div>
             
-            <div class="card-actions-wrap" style="display: flex; gap: 0.35rem; align-items: center;">
+            <div class="card-actions-wrap" style="display: flex; gap: 0.35rem; align-items: center; ${isOutOfStock ? 'width: 100%;' : ''}">
               ${isOutOfStock ? `
-                <button class="add-cart-btn preorder-card-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
-                  <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้า
+                <button class="add-cart-btn preorder-card-btn" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #ffffff; width: 100%; justify-content: center; font-weight: 700; padding: 0.6rem 0.85rem; border-radius: 10px; font-size: 0.92rem; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3); display: flex; align-items: center; gap: 0.5rem;" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')">
+                  <i class="fa-solid fa-calendar-plus"></i> สั่งจองสินค้าล่วงหน้า
                 </button>
               ` : `
                 <button class="add-cart-btn buy-now-card-btn" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #ffffff; padding: 0.45rem 0.75rem; font-weight: 600;" onclick="event.stopPropagation(); quickBuy('${safeId}')" title="สั่งซื้อสินค้านี้ทันที (COD)">
@@ -484,7 +488,7 @@ function viewProductDetail(productId, pushHistory = true) {
   const isLowStock = stock > 0 && stock <= 5;
   const stockClass = isOutOfStock ? "out" : (isLowStock ? "low" : "in");
   const stockText = isOutOfStock
-    ? '<i class="fa-solid fa-clock"></i> สินค้าหมดชั่วคราว (เปิดรับจองล่วงหน้า)'
+    ? '<i class="fa-solid fa-circle-xmark"></i> สินค้าหมดชั่วคราว (เปิดรับจองล่วงหน้า)'
     : (isLowStock ? `<i class="fa-solid fa-triangle-exclamation"></i> ใกล้หมด เหลือเพียง ${stock} ชิ้น` : `<i class="fa-solid fa-boxes-stacked"></i> สต็อกพร้อมส่ง: ${stock} ชิ้น`);
 
   detailContainer.innerHTML = `
@@ -498,16 +502,17 @@ function viewProductDetail(productId, pushHistory = true) {
         <img src="${prod.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" 
              alt="${prod.name}" 
              class="detail-main-img" 
+             style="${isOutOfStock ? 'filter: grayscale(30%); opacity: 0.88;' : ''}"
              onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
       </div>
 
       <!-- Info Side -->
       <div class="product-detail-info">
         <div class="detail-badge-row">
-          <span class="product-badge" style="position: static; font-size: 0.85rem; padding: 0.35rem 0.85rem;">
-            <i class="fa-solid fa-tag"></i> ${prod.category || 'ทั่วไป'}
+          <span class="product-badge" style="position: static; font-size: 0.85rem; padding: 0.35rem 0.85rem; ${isOutOfStock ? 'background: #ef4444; color: #ffffff; font-weight: 700;' : ''}">
+            <i class="fa-solid ${isOutOfStock ? 'fa-circle-xmark' : 'fa-tag'}"></i> ${isOutOfStock ? 'สินค้าหมด' : (prod.category || 'ทั่วไป')}
           </span>
-          <span class="detail-stock-badge ${stockClass}">
+          <span class="detail-stock-badge ${stockClass}" style="${isOutOfStock ? 'background: #fee2e2; color: #ef4444; border-color: #fca5a5; font-weight: 700;' : ''}">
             ${stockText}
           </span>
         </div>
@@ -560,8 +565,8 @@ function viewProductDetail(productId, pushHistory = true) {
           </div>
         ` : `
           <div class="detail-actions-row">
-            <button type="button" class="btn-buy-now" style="background: linear-gradient(135deg, #d97706, #b45309);" onclick="openPreorderForProduct('${encodeURIComponent(prod.name)}')">
-              <i class="fa-solid fa-calendar-plus"></i> สินค้าหมดชั่วคราว - กดสั่งจองล่วงหน้า
+            <button type="button" class="btn-buy-now" style="background: linear-gradient(135deg, #f59e0b, #d97706); width: 100%; justify-content: center; font-size: 1.05rem; font-weight: 700; padding: 0.9rem 1.2rem; box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35); border: none; border-radius: 12px; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 0.6rem;" onclick="openPreorderForProduct('${encodeURIComponent(prod.name)}')">
+              <i class="fa-solid fa-calendar-plus"></i> สินค้าหมดชั่วคราว - กดสั่งจองสินค้าล่วงหน้า
             </button>
           </div>
         `}
@@ -1635,7 +1640,7 @@ async function handleOrderSubmit(e) {
         const response = await fetchWithTimeout(targetApiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...orderData, order_id: orderId })
+          body: JSON.stringify({ ...orderData, order_id: orderId, already_saved: isSavedToRemote })
         }, 7000);
         const result = await response.json();
         if (result && !result.success) {
@@ -1893,6 +1898,9 @@ function openPreorderForProduct(productNameEncoded) {
 function closePreorderModal() {
   document.getElementById("preorderModal").classList.remove("active");
 }
+window.openPreorderModal = openPreorderModal;
+window.openPreorderForProduct = openPreorderForProduct;
+window.closePreorderModal = closePreorderModal;
 
 function handleNotifyChannelChange() {
   const channel = document.getElementById("preNotifyChannel").value;

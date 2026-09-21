@@ -716,7 +716,7 @@ export default async function handler(req, res) {
           }
         }
 
-        const orderId = "ORD-" + Date.now().toString().slice(-6);
+        const orderId = body.order_id || ("ORD-" + Date.now().toString().slice(-6));
         const orderRecord = {
           order_id: orderId,
           timestamp: body.timestamp || getBangkokDateTime(),
@@ -733,33 +733,45 @@ export default async function handler(req, res) {
           note: body.note || ""
         };
 
-        memoryOrders.unshift(orderRecord);
-
-        // ตัดสต็อกใน in-memory
-        for (const itm of rawItems) {
-          const prod = memoryProducts.find(p => String(p.id) === String(itm.id));
-          if (prod) {
-            prod.stock = Math.max(0, (Number(prod.stock) || 0) - (Number(itm.quantity) || 1));
+        const existingMemory = memoryOrders.find(o => o.order_id === orderId);
+        if (!existingMemory) {
+          memoryOrders.unshift(orderRecord);
+          // ตัดสต็อกใน in-memory เฉพาะเมื่อยังไม่มีออเดอร์นี้
+          for (const itm of rawItems) {
+            const prod = memoryProducts.find(p => String(p.id) === String(itm.id));
+            if (prod) {
+              prod.stock = Math.max(0, (Number(prod.stock) || 0) - (Number(itm.quantity) || 1));
+            }
           }
         }
 
-        // บันทึกและตัดสต็อกใน Supabase
+        // บันทึกและตัดสต็อกใน Supabase (ป้องกันการบันทึกซ้ำเบิ้ล 2 ครั้ง และป้องกันการตัดสต็อกซ้ำ)
         if (SUPABASE_URL && SUPABASE_KEY) {
           try {
-            await supabaseRequest("orders", {
-              method: "POST",
-              body: JSON.stringify(orderRecord)
-            });
+            let alreadySaved = body.already_saved === true;
+            if (!alreadySaved) {
+              const existingOrder = await supabaseRequest(`orders?order_id=eq.${encodeURIComponent(orderId)}`);
+              if (existingOrder && existingOrder.length > 0) {
+                alreadySaved = true;
+              }
+            }
 
-            for (const item of rawItems) {
-              const prods = await supabaseRequest(`products?id=eq.${item.id}`);
-              if (prods && prods.length > 0) {
-                const currentStock = Number(prods[0].stock) || 0;
-                const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
-                await supabaseRequest(`products?id=eq.${item.id}`, {
-                  method: "PATCH",
-                  body: JSON.stringify({ stock: newStock })
-                });
+            if (!alreadySaved) {
+              await supabaseRequest("orders", {
+                method: "POST",
+                body: JSON.stringify(orderRecord)
+              });
+
+              for (const item of rawItems) {
+                const prods = await supabaseRequest(`products?id=eq.${encodeURIComponent(item.id)}`);
+                if (prods && prods.length > 0) {
+                  const currentStock = Number(prods[0].stock) || 0;
+                  const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
+                  await supabaseRequest(`products?id=eq.${encodeURIComponent(item.id)}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ stock: newStock })
+                  });
+                }
               }
             }
           } catch (e) {
