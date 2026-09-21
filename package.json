@@ -1,1 +1,5 @@
-﻿{" name\: \schoolshop-bj3\, \version\: \1.0.0\, \type\: \module\}
+{
+    "name":  "schoolshop-bj3",
+    "version":  "1.0.0",
+    "type":  "module"
+}
