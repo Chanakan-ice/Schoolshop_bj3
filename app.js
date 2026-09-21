@@ -45,6 +45,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
 let isSubmittingOrder = false;
 let isSubmittingPreorder = false;
 
+const DEFAULT_SUPABASE_URL = "https://ztxihwioqkekkfokdhew.supabase.co";
 const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
 
 function normalizeSupabaseUrl(input) {
@@ -65,7 +66,7 @@ function normalizeSupabaseUrl(input) {
 
 // Supabase Direct Client Helper (หากมีการตั้งค่า URL และ Anon Key ไว้)
 function getSupabaseConfig() {
-  const rawUrl = localStorage.getItem("SUPABASE_URL") || "";
+  const rawUrl = localStorage.getItem("SUPABASE_URL") || DEFAULT_SUPABASE_URL;
   const url = normalizeSupabaseUrl(rawUrl);
   const key = (localStorage.getItem("SUPABASE_ANON_KEY") || DEFAULT_SUPABASE_KEY).trim();
   if (url && key) {

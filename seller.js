@@ -60,6 +60,7 @@ function getSellerHeaders(custom = {}) {
   return headers;
 }
 
+const DEFAULT_SUPABASE_URL = "https://ztxihwioqkekkfokdhew.supabase.co";
 const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
 
 function normalizeSupabaseUrl(input) {
@@ -80,7 +81,7 @@ function normalizeSupabaseUrl(input) {
 
 // Supabase Direct Client Helper
 function getSupabaseConfig() {
-  const rawUrl = localStorage.getItem("SUPABASE_URL") || "";
+  const rawUrl = localStorage.getItem("SUPABASE_URL") || DEFAULT_SUPABASE_URL;
   const url = normalizeSupabaseUrl(rawUrl);
   const key = (localStorage.getItem("SUPABASE_ANON_KEY") || DEFAULT_SUPABASE_KEY).trim();
   if (url && key) {
@@ -294,7 +295,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const sbUrlInput = document.getElementById("supabaseUrlInput");
   if (sbUrlInput) {
-    sbUrlInput.value = localStorage.getItem("SUPABASE_URL") || "";
+    sbUrlInput.value = localStorage.getItem("SUPABASE_URL") || DEFAULT_SUPABASE_URL;
   }
 
   const sbKeyInput = document.getElementById("supabaseKeyInput");
@@ -339,8 +340,22 @@ async function refreshAllData() {
 // 1. Orders
 async function loadOrders() {
   let apiOrders = [];
+
+  // ลองดึงจาก Supabase โดยตรงก่อน (เรียลไทม์และรวดเร็วข้ามอุปกรณ์)
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      const sbData = await supabaseFetch("orders?select=*&order=created_at.desc");
+      if (Array.isArray(sbData) && sbData.length > 0) {
+        apiOrders = sbData;
+      }
+    } catch (sbErr) {
+      console.warn("Supabase loadOrders failed, fallback to API:", sbErr);
+    }
+  }
+
   const targetUrl = getActiveApiUrl();
-  if (targetUrl) {
+  if (apiOrders.length === 0 && targetUrl) {
     try {
       const res = await fetchWithTimeout(`${targetUrl}?action=getOrders`, {
         headers: getSellerHeaders()
@@ -461,6 +476,19 @@ function filterOrders() {
 
 async function changeOrderStatus(orderId, newStatus) {
   showToast(`กำลังอัปเดตสถานะเป็น "${newStatus}"...`, "info");
+
+  // ซิงก์สถานะไป Supabase โดยตรงทันที
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      await supabaseFetch(`orders?order_id=eq.${encodeURIComponent(orderId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (sbErr) {
+      console.warn("Supabase changeOrderStatus error:", sbErr);
+    }
+  }
 
   if (GAS_API_URL) {
     try {
@@ -583,8 +611,22 @@ function renderProductsTable() {
 // 3. Preorders
 async function loadPreorders() {
   let apiPreorders = [];
+
+  // ลองดึงจาก Supabase โดยตรงก่อน
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      const sbData = await supabaseFetch("preorders?select=*&order=created_at.desc");
+      if (Array.isArray(sbData) && sbData.length > 0) {
+        apiPreorders = sbData;
+      }
+    } catch (sbErr) {
+      console.warn("Supabase loadPreorders failed, fallback to API:", sbErr);
+    }
+  }
+
   const targetUrl = getActiveApiUrl();
-  if (targetUrl) {
+  if (apiPreorders.length === 0 && targetUrl) {
     try {
       const res = await fetchWithTimeout(`${targetUrl}?action=getPreorders`, {
         headers: getSellerHeaders()
@@ -724,6 +766,17 @@ async function saveDeliveryDate(preorderId, dateVal) {
 
   const newStatus = `กำหนดวันรับแล้ว (${dateVal})`;
 
+  // ซิงก์ไป Supabase โดยตรง
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      await supabaseFetch(`preorders?preorder_id=eq.${encodeURIComponent(preorderId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ delivery_date: dateVal, status: newStatus })
+      });
+    } catch (e) {}
+  }
+
   if (GAS_API_URL) {
     try {
       await fetchWithTimeout(GAS_API_URL, {
@@ -754,6 +807,16 @@ async function saveDeliveryDate(preorderId, dateVal) {
 }
 
 async function changePreorderStatus(preorderId, newStatus) {
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      await supabaseFetch(`preorders?preorder_id=eq.${encodeURIComponent(preorderId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (e) {}
+  }
+
   if (GAS_API_URL) {
     try {
       await fetchWithTimeout(GAS_API_URL, {
@@ -776,6 +839,18 @@ async function changePreorderStatus(preorderId, newStatus) {
 
 // 4. Messages
 async function loadMessages() {
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      const sbMsg = await supabaseFetch("messages?select=*&order=created_at.desc");
+      if (Array.isArray(sbMsg) && sbMsg.length > 0) {
+        allMessages = sbMsg;
+        renderMessagesTable();
+        return;
+      }
+    } catch (e) {}
+  }
+
   if (GAS_API_URL) {
     try {
       const res = await fetchWithTimeout(`${GAS_API_URL}?action=getMessages`, {
