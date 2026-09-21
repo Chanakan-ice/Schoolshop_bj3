@@ -253,6 +253,21 @@ function getApiHeaders(customHeaders = {}) {
   return headers;
 }
 
+async function syncStoreConfig() {
+  if (API_URL) {
+    try {
+      const res = await fetchWithTimeout(`${API_URL}?action=getStoreConfig`, {}, 3000);
+      const json = await res.json();
+      if (json && json.success && json.supabase_url && json.supabase_anon_key) {
+        localStorage.setItem("SUPABASE_URL", json.supabase_url);
+        localStorage.setItem("SUPABASE_ANON_KEY", json.supabase_anon_key);
+        return { url: json.supabase_url, key: json.supabase_anon_key };
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
 // ==================== Fetch Products ====================
 async function loadProducts() {
   const countEl = document.getElementById("productCount");
@@ -260,8 +275,13 @@ async function loadProducts() {
 
   let fetchedProducts = null;
 
-  // 1. ลองดึงจาก Supabase โดยตรงหากมี config
-  const sbConfig = getSupabaseConfig();
+  // 1. ตรวจสอบและซิงก์การตั้งค่า Supabase จากเซิร์ฟเวอร์ เพื่อให้ทุกอุปกรณ์เชื่อมต่อตรงกัน
+  let sbConfig = getSupabaseConfig();
+  if (!sbConfig) {
+    sbConfig = await syncStoreConfig();
+  }
+
+  // 2. ลองดึงจาก Supabase โดยตรงหากมี config
   if (sbConfig) {
     try {
       const data = await supabaseFetch("products?select=*&order=created_at.desc");
@@ -1129,39 +1149,117 @@ function renderCartModal() {
 
   if (cart.length === 0) {
     listEl.innerHTML = `
-      <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-        <i class="fa-solid fa-cart-arrow-down" style="font-size: 2.5rem; color: var(--text-light); margin-bottom: 0.5rem;"></i>
-        <p>ยังไม่มีสินค้าในตะกร้า</p>
+      <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+        <i class="fa-solid fa-cart-arrow-down" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 0.75rem;"></i>
+        <h4 style="color: var(--text-main); margin-bottom: 0.25rem;">ยังไม่มีสินค้าในตะกร้า</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">เลือกสินค้าที่คุณชอบแล้วกด "ใส่ตะกร้า" ได้เลยครับ</p>
       </div>
     `;
-    totalEl.innerText = "0 ฿";
-    if (checkoutBtn) checkoutBtn.disabled = true;
+    if (totalEl) totalEl.innerText = "0 บาท";
+    if (checkoutBtn) {
+      checkoutBtn.disabled = true;
+      checkoutBtn.style.opacity = "0.5";
+      checkoutBtn.style.cursor = "not-allowed";
+      checkoutBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> ไปหน้าสั่งซื้อ (COD)';
+    }
     return;
   }
 
-  if (checkoutBtn) checkoutBtn.disabled = false;
+  let hasOutOfStock = false;
+  let hasExceededStock = false;
 
-  listEl.innerHTML = cart.map(item => `
-    <div class="cart-item">
-      <div class="cart-item-info">
-        <div class="cart-item-name">${item.name}</div>
-        <div class="cart-item-price">${Number(item.price).toLocaleString()} ฿ x ${item.quantity} = <strong>${(item.price * item.quantity).toLocaleString()} ฿</strong></div>
-      </div>
-      <div class="qty-control">
-        <button class="qty-btn" onclick="updateCartQuantity('${item.id}', -1)">-</button>
-        <span class="qty-val">${item.quantity}</span>
-        <button class="qty-btn" onclick="updateCartQuantity('${item.id}', 1)">+</button>
-      </div>
-      <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; color: var(--danger);" onclick="updateCartQuantity('${item.id}', -999)" title="ลบ">
-        <i class="fa-solid fa-trash"></i>
-      </button>
-    </div>
-  `).join("");
+  listEl.innerHTML = cart.map(item => {
+    const liveProd = products.find(p => String(p.id) === String(item.id));
+    const liveStock = liveProd ? (Number(liveProd.stock) || 0) : 0;
+    const isOutOfStock = liveStock <= 0;
+    const isExceeded = !isOutOfStock && item.quantity > liveStock;
 
-  totalEl.innerText = `${calculateCartTotal().toLocaleString()} ฿`;
+    if (isOutOfStock) hasOutOfStock = true;
+    if (isExceeded) hasExceededStock = true;
+
+    return `
+      <div class="cart-item" style="${isOutOfStock ? 'background: #fff5f5; border: 1px solid #fecaca; border-radius: 12px; padding: 0.85rem; margin-bottom: 0.75rem;' : 'padding: 0.85rem 0; border-bottom: 1px solid var(--border);'}">
+        <div class="cart-item-info" style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+            <strong class="cart-item-name" style="font-size: 0.95rem; color: ${isOutOfStock ? '#dc2626' : 'var(--text-main)'};">${item.name}</strong>
+            ${isOutOfStock ? `
+              <span class="badge" style="background: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+                <i class="fa-solid fa-ban"></i> สินค้าหมดแล้ว
+              </span>
+            ` : (isExceeded ? `
+              <span class="badge" style="background: #f59e0b; color: #ffffff; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">
+                <i class="fa-solid fa-triangle-exclamation"></i> เหลือเพียง ${liveStock} ชิ้น
+              </span>
+            ` : '')}
+          </div>
+
+          <div class="cart-item-price" style="font-size: 0.88rem; color: var(--text-muted);">
+            ${Number(item.price).toLocaleString()} ฿ x ${item.quantity} = <strong style="color: var(--primary);">${(item.price * item.quantity).toLocaleString()} ฿</strong>
+          </div>
+
+          ${isOutOfStock ? `
+            <div style="margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 0.8rem; color: #dc2626;">สินค้านี้หมดชั่วคราว ไม่สามารถสั่งซื้อแบบ COD ได้</span>
+              <button type="button" onclick="openPreorderForProduct('${encodeURIComponent(item.name)}'); closeCartModal();" style="background: #fffbeb; border: 1px solid #fde68a; color: #b45309; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+                <i class="fa-solid fa-calendar-plus"></i> สั่งจองล่วงหน้าแทน
+              </button>
+            </div>
+          ` : (isExceeded ? `
+            <div style="font-size: 0.8rem; color: #d97706; margin-top: 4px;">
+              * จำนวนในตะกร้า (${item.quantity}) เกินสต็อกที่มี (${liveStock}) กรุณากดปุ่มเครื่องหมายลบ (-) เพื่อลดจำนวน
+            </div>
+          ` : '')}
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="qty-control" style="display: flex; align-items: center; gap: 4px;">
+            <button type="button" class="qty-btn" onclick="updateCartQuantity('${encodeURIComponent(item.id)}', -1)">-</button>
+            <span class="qty-val" style="min-width: 24px; text-align: center; font-weight: 600;">${item.quantity}</span>
+            <button type="button" class="qty-btn" onclick="updateCartQuantity('${encodeURIComponent(item.id)}', 1)" ${isOutOfStock || (liveStock > 0 && item.quantity >= liveStock) ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>+</button>
+          </div>
+          <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.6rem; font-size: 0.8rem; color: var(--danger); border-color: #fecaca;" onclick="updateCartQuantity('${encodeURIComponent(item.id)}', -999)" title="ลบรายการนี้">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const totalPrice = calculateCartTotal();
+  if (totalEl) totalEl.innerText = `${totalPrice.toLocaleString()} บาท`;
+
+  if (checkoutBtn) {
+    if (hasOutOfStock) {
+      checkoutBtn.disabled = true;
+      checkoutBtn.style.opacity = "0.55";
+      checkoutBtn.style.cursor = "not-allowed";
+      checkoutBtn.style.background = "#94a3b8";
+      checkoutBtn.style.borderColor = "#94a3b8";
+      checkoutBtn.innerHTML = '<i class="fa-solid fa-ban"></i> มีสินค้าหมดในตะกร้า (กรุณาลบออก)';
+    } else if (hasExceededStock) {
+      checkoutBtn.disabled = true;
+      checkoutBtn.style.opacity = "0.55";
+      checkoutBtn.style.cursor = "not-allowed";
+      checkoutBtn.style.background = "#f59e0b";
+      checkoutBtn.style.borderColor = "#f59e0b";
+      checkoutBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> สต็อกไม่พอ (กรุณาลดจำนวน)';
+    } else {
+      checkoutBtn.disabled = false;
+      checkoutBtn.style.opacity = "1";
+      checkoutBtn.style.cursor = "pointer";
+      checkoutBtn.style.background = "";
+      checkoutBtn.style.borderColor = "";
+      checkoutBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> ไปหน้าสั่งซื้อ (COD)';
+    }
+  }
 }
 
 // ==================== Checkout & COD Order Submission ====================
+function proceedToCheckout() {
+  openCheckoutModal();
+}
+window.proceedToCheckout = proceedToCheckout;
+
 function switchBuyerType(type) {
   const btnStudent = document.getElementById("btnTypeStudent");
   const btnTeacher = document.getElementById("btnTypeTeacher");
@@ -1234,31 +1332,46 @@ function syncTeacherLocation(dept, isPreorder = false) {
 }
 
 function openCheckoutModal(customItems = null) {
+  let itemsToCheckout = [];
   if (customItems && Array.isArray(customItems) && customItems.length > 0) {
-    activeCheckoutItems = customItems;
+    itemsToCheckout = customItems;
     isBuyNowFlow = true;
   } else {
     if (cart.length === 0) {
       showToast("กรุณาเลือกสินค้าลงในตะกร้าก่อนครับ", "error");
       return;
     }
-    activeCheckoutItems = [...cart];
+    itemsToCheckout = [...cart];
     isBuyNowFlow = false;
   }
 
-  // Check if customer is logged in
-  const current = getCurrentCustomer();
-  if (!current) {
-    showToast("กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อนทำการสั่งซื้อครับ", "info");
-    pendingCheckoutItems = activeCheckoutItems;
-    openCustomerAuthModal('login');
-    return;
+  // ตรวจสอบสต็อกอย่างเข้มงวดก่อนอนุญาตให้เปิดหน้าสั่งซื้อ
+  for (const item of itemsToCheckout) {
+    const prod = products.find(p => String(p.id) === String(item.id));
+    const stock = prod ? (Number(prod.stock) || 0) : 0;
+    if (stock <= 0) {
+      showToast(`สินค้า "${item.name}" หมดแล้ว กรุณาลบออกจากตะกร้าหรือเปลี่ยนเป็นสั่งจองล่วงหน้า`, "error");
+      openCartModal();
+      return;
+    }
+    if (item.quantity > stock) {
+      showToast(`สินค้า "${item.name}" มีสต็อกเพียง ${stock} ชิ้น (ในตะกร้ามี ${item.quantity} ชิ้น)`, "error");
+      openCartModal();
+      return;
+    }
   }
+
+  activeCheckoutItems = itemsToCheckout;
 
   closeCartModal();
   autoFillCustomerData();
-  document.getElementById("checkoutModal").classList.add("active");
+
+  const checkoutModal = document.getElementById("checkoutModal");
+  if (checkoutModal) {
+    checkoutModal.classList.add("active");
+  }
 }
+window.openCheckoutModal = openCheckoutModal;
 
 function closeCheckoutModal() {
   document.getElementById("checkoutModal").classList.remove("active");

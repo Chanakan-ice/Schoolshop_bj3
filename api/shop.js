@@ -73,9 +73,10 @@ let memoryOrders = [];
 let memoryPreorders = [];
 let memoryMessages = [];
 
-// ==============================================================================
-// Authentication & Security State
-// ==============================================================================
+// Global Cloud Database Config (แชร์การเชื่อมต่อ Supabase ข้ามอุปกรณ์ได้ทันที)
+let globalSupabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+let globalSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
 let currentAdminPassword = process.env.SELLER_ADMIN_PASSWORD || "BJ3@SchoolShop#2026";
 const TOKEN_SECRET = process.env.SELLER_SECRET || "schoolshop_bj3_seller_auth_secret_2026";
 const activeSellerTokens = new Map(); // token -> { expiresAt, ip }
@@ -307,12 +308,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  const clientSbUrl = req.headers["x-supabase-url"] || (req.query && req.query.supabase_url);
-  const clientSbKey = req.headers["x-supabase-key"] || (req.query && req.query.supabase_key);
-  const clientResendKey = req.headers["x-resend-key"] || (req.query && req.query.resend_key);
+  const clientSbUrl = req.headers["x-supabase-url"] || (req.query && req.query.supabase_url) || body.supabase_url;
+  const clientSbKey = req.headers["x-supabase-key"] || (req.query && req.query.supabase_key) || body.supabase_key;
+  const clientResendKey = req.headers["x-resend-key"] || (req.query && req.query.resend_key) || body.resend_key;
 
-  const SUPABASE_URL = clientSbUrl || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const SUPABASE_KEY = clientSbKey || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (clientSbUrl && clientSbKey) {
+    globalSupabaseUrl = clientSbUrl;
+    globalSupabaseKey = clientSbKey;
+  }
+
+  const SUPABASE_URL = clientSbUrl || globalSupabaseUrl || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SUPABASE_KEY = clientSbKey || globalSupabaseKey || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const RESEND_KEY = clientResendKey || process.env.RESEND_API_KEY;
 
   let body = req.body;
@@ -351,6 +357,16 @@ export default async function handler(req, res) {
     // GET Requests
     // -------------------------------------------------------------
     if (req.method === "GET") {
+      // 0. ซิงก์ค่าการเชื่อมต่อฐานข้อมูลสำหรับอุปกรณ์ของผู้ซื้อ (หน้าร้าน)
+      if (action === "getStoreConfig") {
+        return res.status(200).json({
+          success: true,
+          supabase_url: SUPABASE_URL || "",
+          supabase_anon_key: SUPABASE_KEY || "",
+          supabase_connected: Boolean(SUPABASE_URL && SUPABASE_KEY)
+        });
+      }
+
       // 1. รายการสินค้า (สาธารณะ: หน้าร้าน + หลังร้าน)
       if (action === "getProducts") {
         if (SUPABASE_URL && SUPABASE_KEY) {
@@ -575,6 +591,31 @@ export default async function handler(req, res) {
           success: true,
           message: "เปลี่ยนรหัสผ่านผู้ดูแลระบบเรียบร้อยแล้ว รหัสใหม่มีผลทันที"
         });
+      }
+
+      // =========================================================
+      // 0.2 บันทึกการเชื่อมต่อ Supabase ข้ามอุปกรณ์
+      // =========================================================
+      if (postAction === "saveSupabaseConfig") {
+        const url = String(body.url || body.supabase_url || "").trim();
+        const key = String(body.key || body.supabase_anon_key || "").trim();
+        if (url && key) {
+          globalSupabaseUrl = url;
+          globalSupabaseKey = key;
+          return res.status(200).json({
+            success: true,
+            message: "บันทึกและแชร์การเชื่อมต่อ Supabase สำเร็จแล้ว ทุกอุปกรณ์จะซิงก์กันทันที",
+            connected: true
+          });
+        } else {
+          globalSupabaseUrl = "";
+          globalSupabaseKey = "";
+          return res.status(200).json({
+            success: true,
+            message: "รีเซ็ตการตั้งค่า Supabase เรียบร้อยแล้ว",
+            connected: false
+          });
+        }
       }
 
       // ทดสอบส่งอีเมล (POST)

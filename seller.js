@@ -237,7 +237,26 @@ var allProducts = getInitialSellerProducts();
 var allPreorders = window.allPreorders || [];
 var allMessages = window.allMessages || [];
 
-document.addEventListener("DOMContentLoaded", () => {
+async function syncStoreConfig() {
+  if (GAS_API_URL) {
+    try {
+      const res = await fetchWithTimeout(`${GAS_API_URL}?action=getStoreConfig`, {}, 3000);
+      const json = await res.json();
+      if (json && json.success && json.supabase_url && json.supabase_anon_key) {
+        localStorage.setItem("SUPABASE_URL", json.supabase_url);
+        localStorage.setItem("SUPABASE_ANON_KEY", json.supabase_anon_key);
+        const sbUrlInput = document.getElementById("supabaseUrlInput");
+        if (sbUrlInput && !sbUrlInput.value) sbUrlInput.value = json.supabase_url;
+        const sbKeyInput = document.getElementById("supabaseKeyInput");
+        if (sbKeyInput && !sbKeyInput.value) sbKeyInput.value = json.supabase_anon_key;
+        return { url: json.supabase_url, key: json.supabase_anon_key };
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   const apiInput = document.getElementById("apiUrlInput");
   if (apiInput && GAS_API_URL) {
     apiInput.value = GAS_API_URL;
@@ -263,6 +282,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (sbKeyInput) {
     sbKeyInput.value = localStorage.getItem("SUPABASE_ANON_KEY") || "";
   }
+
+  // ซิงก์การตั้งค่า Supabase จากเซิร์ฟเวอร์อัตโนมัติ เพื่อให้ข้ามอุปกรณ์ได้
+  await syncStoreConfig();
 
   // ตรวจสอบ Auth เมื่อเปิดหน้า seller (ทั้ง /seller หรือ seller.html)
   if (window.location.pathname.includes("seller") || window.location.search.includes("view=seller")) {
@@ -1188,6 +1210,21 @@ async function saveCloudSettings() {
 
   API_URL = apiUrl;
   GAS_API_URL = apiUrl;
+
+  // ส่งบันทึกไปยังเซิร์ฟเวอร์เพื่อให้ทุกอุปกรณ์ (มือถือ/ไอแพด/คอมเครื่องอื่น) ซิงก์เชื่อมต่อตรงกันทันที
+  if (GAS_API_URL) {
+    try {
+      fetchWithTimeout(GAS_API_URL, {
+        method: "POST",
+        headers: getSellerHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          action: "saveSupabaseConfig",
+          url: sbUrl,
+          key: sbKey
+        })
+      }, 5000).catch(() => {});
+    } catch (e) {}
+  }
 
   showToast("✅ บันทึกการตั้งค่าระบบ Vercel & Supabase เรียบร้อยแล้ว", "success");
   if (sbUrl && sbKey) {
