@@ -940,7 +940,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ success: false, message: "จำนวนสต็อกต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป" });
         }
 
-        const prodId = body.id || ("P" + ("000" + (memoryProducts.length + 1)).slice(-3));
+        const prodId = body.id || ("P" + Date.now().toString().slice(-6) + "_" + Math.random().toString(36).substring(2, 6));
         const newProduct = {
           id: prodId,
           name: name,

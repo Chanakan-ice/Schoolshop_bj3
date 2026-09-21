@@ -134,8 +134,62 @@ const DEFAULT_PRODUCTS = [
   }
 ];
 
+// Custom Products Persistence Helpers (รับรองสินค้าไม่หายเวลารีเฟรช 100%)
+function getCustomProducts() {
+  try {
+    const data = JSON.parse(localStorage.getItem("SCHOOLSHOP_CUSTOM_PRODUCTS") || "[]");
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getDeletedProductIds() {
+  try {
+    const data = JSON.parse(localStorage.getItem("SCHOOLSHOP_DELETED_PRODUCT_IDS") || "[]");
+    return Array.isArray(data) ? data.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function mergeProducts(remoteList) {
+  const customList = getCustomProducts();
+  const deletedIds = new Set(getDeletedProductIds());
+  const map = new Map();
+
+  // 1. นำเข้ารายการจาก Remote หรือ Mock ที่ไม่เคยถูกลบ
+  const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
+  baseList.forEach(p => {
+    if (p && p.id && !deletedIds.has(String(p.id))) {
+      map.set(String(p.id), { ...p });
+    }
+  });
+
+  // 2. รวมรายการ Custom Products ที่เพิ่มไว้ในเครื่องเสมอ (ไม่โดนเขียนทับแน่นอน)
+  customList.forEach(p => {
+    if (p && p.id && !deletedIds.has(String(p.id))) {
+      map.set(String(p.id), { ...p });
+    }
+  });
+
+  return Array.from(map.values());
+}
+
+function getInitialProducts() {
+  const saved = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  let list = [];
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
+    } catch (e) {}
+  }
+  return mergeProducts(list.length > 0 ? list : DEFAULT_PRODUCTS);
+}
+
 // App State
-let products = [];
+let products = getInitialProducts();
 let cart = JSON.parse(localStorage.getItem("SCHOOLSHOP_CART")) || [];
 let selectedCategory = "all";
 let searchQuery = "";
@@ -143,6 +197,7 @@ let pendingCheckoutItems = null;
 let isBuyNowFlow = false;
 let activeCheckoutItems = null;
 let regSelectedRole = "student";
+let isNavigatingDetail = false;
 
 // ==================== Initialization ====================
 document.addEventListener("DOMContentLoaded", () => {
@@ -201,7 +256,9 @@ function getApiHeaders(customHeaders = {}) {
 // ==================== Fetch Products ====================
 async function loadProducts() {
   const countEl = document.getElementById("productCount");
-  if (countEl) countEl.innerText = "กำลังโหลดข้อมูล...";
+  if (countEl && products.length === 0) countEl.innerText = "กำลังโหลดข้อมูล...";
+
+  let fetchedProducts = null;
 
   // 1. ลองดึงจาก Supabase โดยตรงหากมี config
   const sbConfig = getSupabaseConfig();
@@ -209,10 +266,7 @@ async function loadProducts() {
     try {
       const data = await supabaseFetch("products?select=*&order=created_at.desc");
       if (Array.isArray(data) && data.length > 0) {
-        products = data;
-        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
-        renderProducts();
-        return;
+        fetchedProducts = data;
       }
     } catch (sbErr) {
       console.warn("Supabase fetch failed, fallback to API:", sbErr);
@@ -220,42 +274,45 @@ async function loadProducts() {
   }
 
   // 2. ลองดึงผ่าน Vercel Serverless Function API พร้อม Timeout Guard 5 วินาที
-  if (API_URL) {
+  if (!fetchedProducts && API_URL) {
     try {
       const res = await fetchWithTimeout(`${API_URL}?action=getProducts`, {
         headers: getApiHeaders()
       }, 5000);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        products = json.data;
-        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
-        renderProducts();
-        return;
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        fetchedProducts = json.data;
       }
     } catch (err) {
       console.warn("ไม่สามารถดึงข้อมูลจาก API ได้ (Timeout/Offline) ใช้ข้อมูลสำรองในเครื่องแทน:", err);
     }
   }
 
-  // 3. Fallback to local / mock products
-  const localSavedProducts = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
-  if (localSavedProducts) {
+  // 3. รวมสินค้า Remote กับ Custom Products ที่บันทึกไว้ในเครื่องเสมอ ป้องกันสินค้ารีเฟรชแล้วหาย 100%
+  const savedLocal = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  let localList = [];
+  if (savedLocal) {
     try {
-      const parsed = JSON.parse(localSavedProducts);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        products = parsed;
-      } else {
-        products = DEFAULT_PRODUCTS;
-      }
-    } catch (e) {
-      products = DEFAULT_PRODUCTS;
-    }
-  } else {
-    products = DEFAULT_PRODUCTS;
-    localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
+      const parsed = JSON.parse(savedLocal);
+      if (Array.isArray(parsed)) localList = parsed;
+    } catch (e) {}
   }
 
+  const baseList = fetchedProducts || (localList.length > 0 ? localList : DEFAULT_PRODUCTS);
+  products = mergeProducts(baseList);
+  localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(products));
+
   renderProducts();
+
+  // หากอยู่ในหน้า Detail ให้คงการแสดงผลสินค้ารายการเดิมไว้ ไม่ให้เปลี่ยนหรือรีเซ็ต
+  const hash = window.location.hash || "";
+  if (hash.startsWith("#product-")) {
+    const pId = decodeURIComponent(hash.replace("#product-", ""));
+    const currentDetail = products.find(p => String(p.id) === pId);
+    if (currentDetail) {
+      viewProductDetail(pId, false);
+    }
+  }
 }
 
 // ==================== Render Products Grid ====================
@@ -297,9 +354,10 @@ function renderProducts() {
     const stock = Number(item.stock) || 0;
     const isOutOfStock = stock <= 0;
     const isLowStock = stock > 0 && stock <= 5;
+    const safeId = encodeURIComponent(String(item.id));
 
     return `
-      <div class="product-card" onclick="viewProductDetail('${item.id}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียดและสั่งซื้อ">
+      <div class="product-card" data-product-id="${safeId}" onclick="viewProductDetail('${safeId}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียดและสั่งซื้อ">
         <div class="product-image-wrap">
           <img src="${item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="${item.name}" class="product-img" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'">
           <span class="product-badge">${item.category || 'ทั่วไป'}</span>
@@ -325,7 +383,7 @@ function renderProducts() {
                 <button class="card-preorder-icon-btn" onclick="event.stopPropagation(); openPreorderForProduct('${encodeURIComponent(item.name)}')" title="สั่งจองล่วงหน้ารายการนี้">
                   <i class="fa-solid fa-calendar-plus"></i> จอง
                 </button>
-                <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${item.id}')">
+                <button class="add-cart-btn" onclick="event.stopPropagation(); addToCart('${safeId}')">
                   <i class="fa-solid fa-cart-plus"></i> ใส่ตะกร้า
                 </button>
               `}
@@ -338,8 +396,16 @@ function renderProducts() {
 
 // ==================== Product Detail View (หน้ารายละเอียดสินค้า & สั่งซื้อทันที) ====================
 function viewProductDetail(productId, pushHistory = true) {
-  const prod = products.find(p => String(p.id) === String(productId));
-  if (!prod) return;
+  const cleanId = decodeURIComponent(String(productId || "").trim());
+  let prod = products.find(p => String(p.id) === cleanId);
+  if (!prod) {
+    const allSaved = getInitialProducts();
+    prod = allSaved.find(p => String(p.id) === cleanId);
+  }
+  if (!prod) {
+    console.warn("ไม่พบสินค้าที่ตรงกับรหัส:", cleanId);
+    return;
+  }
 
   const mainShop = document.getElementById("mainShopView");
   const detailView = document.getElementById("productDetailView");
@@ -351,7 +417,9 @@ function viewProductDetail(productId, pushHistory = true) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   if (pushHistory) {
-    window.location.hash = "product-" + productId;
+    isNavigatingDetail = true;
+    window.location.hash = "product-" + encodeURIComponent(cleanId);
+    setTimeout(() => { isNavigatingDetail = false; }, 150);
   }
 
   const stock = Number(prod.stock) || 0;
@@ -534,9 +602,10 @@ function buyNowCurrentProduct(productId) {
 }
 
 function handleUrlHash() {
+  if (isNavigatingDetail) return;
   const hash = window.location.hash || "";
   if (hash.startsWith("#product-")) {
-    const pId = hash.replace("#product-", "");
+    const pId = decodeURIComponent(hash.replace("#product-", ""));
     viewProductDetail(pId, false);
   } else {
     closeProductDetail(false);

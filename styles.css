@@ -311,33 +311,34 @@ body {
   box-shadow: 0 3px 8px rgba(2, 132, 199, 0.25);
 }
 
-/* ==================== Product Grid ==================== */
+/* ==================== Product Grid (การจัดเรียงสินค้าแนวนอน แยกการ์ดชัดเจน) ==================== */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.35rem;
   width: 100%;
   align-items: stretch;
 }
 
 .product-card {
-  background-color: var(--bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+  background-color: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease;
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
 .product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--accent);
+  transform: translateY(-5px);
+  box-shadow: 0 12px 24px -4px rgba(2, 132, 199, 0.16), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-color: var(--primary);
 }
 
 .product-image-wrap {
@@ -1868,14 +1869,17 @@ body {
     align-items: center;
   }
 
-  /* 2-column mobile product grid */
+  /* 2-column mobile product grid (แนวนอน 2 คอลัมน์ แยกการ์ดชัดเจน) */
   .products-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 0.65rem !important;
+    gap: 0.75rem !important;
   }
 
   .product-card {
     border-radius: var(--radius-md);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
+    background-color: #ffffff;
   }
 
   .product-image-wrap {

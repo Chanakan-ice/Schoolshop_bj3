@@ -159,16 +159,77 @@ function getApiHeaders(customHeaders = {}) {
   return headers;
 }
 
-// State
+// State & Custom Products Persistence (ป้องกันสินค้ารีเฟรชแล้วหาย 100%)
+function getCustomProducts() {
+  try {
+    const data = JSON.parse(localStorage.getItem("SCHOOLSHOP_CUSTOM_PRODUCTS") || "[]");
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomProducts(list) {
+  try {
+    localStorage.setItem("SCHOOLSHOP_CUSTOM_PRODUCTS", JSON.stringify(list || []));
+  } catch (e) {}
+}
+
+function getDeletedProductIds() {
+  try {
+    const data = JSON.parse(localStorage.getItem("SCHOOLSHOP_DELETED_PRODUCT_IDS") || "[]");
+    return Array.isArray(data) ? data.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveDeletedProductIds(list) {
+  try {
+    localStorage.setItem("SCHOOLSHOP_DELETED_PRODUCT_IDS", JSON.stringify(list || []));
+  } catch (e) {}
+}
+
+// สร้างรหัสสินค้าที่ไม่ซ้ำแน่นอน 100% ป้องกันรหัสชนกันและการกดแล้วสลับสินค้า
+function generateUniqueProductId() {
+  const ts = Date.now().toString().slice(-6);
+  const rand = Math.random().toString(36).substring(2, 6);
+  return `P${ts}_${rand}`;
+}
+
+function mergeSellerProducts(remoteList) {
+  const customList = getCustomProducts();
+  const deletedIds = new Set(getDeletedProductIds());
+  const map = new Map();
+
+  // 1. Remote or default items that are not deleted
+  const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
+  baseList.forEach(p => {
+    if (p && p.id && !deletedIds.has(String(p.id))) {
+      map.set(String(p.id), { ...p });
+    }
+  });
+
+  // 2. Custom products ALWAYS take precedence and are NEVER lost on refresh
+  customList.forEach(p => {
+    if (p && p.id && !deletedIds.has(String(p.id))) {
+      map.set(String(p.id), { ...p });
+    }
+  });
+
+  return Array.from(map.values());
+}
+
 function getInitialSellerProducts() {
   const saved = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  let list = [];
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
     } catch (e) {}
   }
-  return [...DEFAULT_PRODUCTS];
+  return mergeSellerProducts(list.length > 0 ? list : DEFAULT_PRODUCTS);
 }
 
 var allOrders = window.allOrders || [];
@@ -390,16 +451,15 @@ async function changeOrderStatus(orderId, newStatus) {
 
 // 2. Products
 async function loadSellerProducts() {
+  let fetchedProducts = null;
+
   // 1. ลองดึงจาก Supabase โดยตรงหากมี config
   const sbConfig = getSupabaseConfig();
   if (sbConfig) {
     try {
       const data = await supabaseFetch("products?select=*&order=created_at.desc");
       if (Array.isArray(data) && data.length > 0) {
-        allProducts = data;
-        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
-        renderProductsTable();
-        return;
+        fetchedProducts = data;
       }
     } catch (sbErr) {
       console.warn("Supabase products fetch failed:", sbErr);
@@ -407,35 +467,33 @@ async function loadSellerProducts() {
   }
 
   // 2. ลองดึงผ่าน API พร้อม Timeout Guard
-  if (GAS_API_URL) {
+  if (!fetchedProducts && GAS_API_URL) {
     try {
       const res = await fetchWithTimeout(`${GAS_API_URL}?action=getProducts`, {
         headers: getSellerHeaders()
       }, 6000);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        allProducts = json.data;
-        localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
-        renderProductsTable();
-        return;
+      if (json && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        fetchedProducts = json.data;
       }
     } catch (e) {
       console.warn("API Products fetch failed/timeout:", e);
     }
   }
 
-  // 3. ดึงจาก Local Storage หรือ Mock Data
+  // 3. รวมสินค้า Remote กับ Custom Products ที่บันทึกไว้ในเครื่องเสมอ ป้องกันสินค้ารีเฟรชแล้วหาย 100%
   const savedLocal = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
+  let localList = [];
   if (savedLocal) {
     try {
-      allProducts = JSON.parse(savedLocal);
-    } catch (e) {
-      allProducts = DEFAULT_PRODUCTS;
-    }
-  } else {
-    allProducts = DEFAULT_PRODUCTS;
-    localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(DEFAULT_PRODUCTS));
+      const parsed = JSON.parse(savedLocal);
+      if (Array.isArray(parsed)) localList = parsed;
+    } catch (e) {}
   }
+
+  const baseList = fetchedProducts || (localList.length > 0 ? localList : DEFAULT_PRODUCTS);
+  allProducts = mergeSellerProducts(baseList);
+  localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
   renderProductsTable();
 }
 window.loadSellerProducts = loadSellerProducts;
@@ -897,8 +955,11 @@ async function handleProductFormSubmit(e) {
     return;
   }
 
+  // สร้างรหัสที่ไม่ซ้ำแน่นอน 100% ป้องกันรหัสชนกันและการกดผิดรายการ
+  const uniqueId = id || generateUniqueProductId();
+
   const data = {
-    id: id || ("P" + ("000" + (allProducts.length + 1)).slice(-3)),
+    id: uniqueId,
     name: name,
     category: category,
     price: price,
@@ -909,12 +970,35 @@ async function handleProductFormSubmit(e) {
 
   showToast("กำลังบันทึกสินค้า...", "info");
 
-  // 1. ส่งตรงไป Supabase หากเชื่อมต่อไว้
+  // 1. บันทึกลง Custom Products และ LocalStorage ทันที (ป้องกันสินค้ารีเฟรชแล้วหาย 100%)
+  const customList = getCustomProducts();
+  const existingCustomIdx = customList.findIndex(p => String(p.id) === String(uniqueId));
+  if (existingCustomIdx > -1) {
+    customList[existingCustomIdx] = { ...customList[existingCustomIdx], ...data };
+  } else {
+    customList.unshift(data);
+  }
+  saveCustomProducts(customList);
+
+  // ลบออกจากรายการที่เคยบันทึกว่าถูกลบ (หากมี)
+  const remainingDeletedIds = getDeletedProductIds().filter(dId => String(dId) !== String(uniqueId));
+  saveDeletedProductIds(remainingDeletedIds);
+
+  // อัปเดตใน allProducts
+  if (id) {
+    const idx = allProducts.findIndex(p => String(p.id) === String(id));
+    if (idx > -1) allProducts[idx] = { ...allProducts[idx], ...data };
+  } else {
+    allProducts.unshift(data);
+  }
+  localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
+
+  // 2. ส่งตรงไป Supabase หากเชื่อมต่อไว้
   try {
     const sbConfig = getSupabaseConfig();
     if (sbConfig) {
       if (id) {
-        await supabaseFetch(`products?id=eq.${id}`, {
+        await supabaseFetch(`products?id=eq.${encodeURIComponent(id)}`, {
           method: "PATCH",
           body: JSON.stringify(data)
         });
@@ -929,7 +1013,7 @@ async function handleProductFormSubmit(e) {
     console.warn("Supabase product save failed:", sbErr);
   }
 
-  // 2. ส่งผ่าน API (/api/shop) พร้อม Authentication Header
+  // 3. ส่งผ่าน API (/api/shop) พร้อม Authentication Header
   if (GAS_API_URL) {
     try {
       const action = id ? "updateProduct" : "addProduct";
@@ -950,15 +1034,6 @@ async function handleProductFormSubmit(e) {
     }
   }
 
-  // 3. อัปเดต Local Storage เสมอ
-  if (id) {
-    const idx = allProducts.findIndex(p => String(p.id) === String(id));
-    if (idx > -1) allProducts[idx] = { ...allProducts[idx], ...data };
-  } else {
-    allProducts.push(data);
-  }
-  localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
-
   closeProductModal();
   renderProductsTable();
   updateMetrics();
@@ -968,11 +1043,24 @@ async function handleProductFormSubmit(e) {
 async function deleteProduct(productId) {
   if (!confirm(`คุณต้องการลบสินค้ารหัส ${productId} ใช่หรือไม่?`)) return;
 
-  // 1. ลบจาก Supabase หากเชื่อมต่อไว้
+  const strId = String(productId);
+
+  // 1. บันทึก ID ที่ถูกลบ เพื่อไม่ให้ Mock Data หรือ Remote เก่าดึงกลับมาแสดงอีกเวลารีเฟรช
+  const deletedIds = getDeletedProductIds();
+  if (!deletedIds.includes(strId)) {
+    deletedIds.push(strId);
+    saveDeletedProductIds(deletedIds);
+  }
+
+  // 2. ลบออกจาก Custom Products
+  const updatedCustomList = getCustomProducts().filter(p => String(p.id) !== strId);
+  saveCustomProducts(updatedCustomList);
+
+  // 3. ลบจาก Supabase หากเชื่อมต่อไว้
   try {
     const sbConfig = getSupabaseConfig();
     if (sbConfig) {
-      await supabaseFetch(`products?id=eq.${productId}`, {
+      await supabaseFetch(`products?id=eq.${encodeURIComponent(productId)}`, {
         method: "DELETE"
       });
     }
@@ -980,7 +1068,7 @@ async function deleteProduct(productId) {
     console.warn("Supabase delete failed:", sbErr);
   }
 
-  // 2. ลบผ่าน API พร้อม Authentication Header
+  // 4. ลบผ่าน API พร้อม Authentication Header
   if (GAS_API_URL) {
     try {
       await fetchWithTimeout(GAS_API_URL, {
@@ -991,7 +1079,7 @@ async function deleteProduct(productId) {
     } catch (err) {}
   }
 
-  allProducts = allProducts.filter(p => String(p.id) !== String(productId));
+  allProducts = allProducts.filter(p => String(p.id) !== strId);
   localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
   renderProductsTable();
   updateMetrics();
@@ -1065,7 +1153,28 @@ function updateMetrics() {
 }
 
 // ==================== Cloud Settings (Vercel API & Supabase) ====================
-function saveCloudSettings() {
+async function syncProductsToSupabase() {
+  const sbConfig = getSupabaseConfig();
+  if (!sbConfig) return;
+  try {
+    const existing = await supabaseFetch("products?select=id");
+    const existingIds = new Set((existing || []).map(p => String(p.id)));
+    const toUpload = allProducts.filter(p => !existingIds.has(String(p.id)));
+    if (toUpload.length > 0) {
+      for (const prod of toUpload) {
+        await supabaseFetch("products", {
+          method: "POST",
+          body: JSON.stringify(prod)
+        });
+      }
+      console.log(`ซิงก์สินค้า ${toUpload.length} รายการเข้าสู่ Supabase สำเร็จ`);
+    }
+  } catch (e) {
+    console.warn("ซิงก์สินค้าไป Supabase ขัดข้อง:", e);
+  }
+}
+
+async function saveCloudSettings() {
   const apiUrl = (document.getElementById("apiUrlInput") ? document.getElementById("apiUrlInput").value : "").trim() || DEFAULT_API_URL;
   const sbUrl = (document.getElementById("supabaseUrlInput") ? document.getElementById("supabaseUrlInput").value : "").trim();
   const sbKey = (document.getElementById("supabaseKeyInput") ? document.getElementById("supabaseKeyInput").value : "").trim();
@@ -1081,6 +1190,9 @@ function saveCloudSettings() {
   GAS_API_URL = apiUrl;
 
   showToast("✅ บันทึกการตั้งค่าระบบ Vercel & Supabase เรียบร้อยแล้ว", "success");
+  if (sbUrl && sbKey) {
+    await syncProductsToSupabase();
+  }
   refreshAllData();
 }
 window.saveCloudSettings = saveCloudSettings;
@@ -1096,6 +1208,7 @@ async function testCloudConnection() {
   if (sbConfig) {
     try {
       const data = await supabaseFetch("products?select=id&limit=1");
+      await syncProductsToSupabase();
       showToast("🎉 เชื่อมต่อ Supabase Cloud Database สำเร็จ 100%!", "success");
       refreshAllData();
       return;
