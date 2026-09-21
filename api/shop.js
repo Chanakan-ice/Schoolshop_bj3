@@ -74,8 +74,9 @@ let memoryPreorders = [];
 let memoryMessages = [];
 
 // Global Cloud Database Config (แชร์การเชื่อมต่อ Supabase ข้ามอุปกรณ์ได้ทันที)
+const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
 let globalSupabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-let globalSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+let globalSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY;
 
 let currentAdminPassword = process.env.SELLER_ADMIN_PASSWORD || "BJ3@SchoolShop#2026";
 const TOKEN_SECRET = process.env.SELLER_SECRET || "schoolshop_bj3_seller_auth_secret_2026";

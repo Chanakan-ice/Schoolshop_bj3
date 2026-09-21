@@ -45,10 +45,29 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
 let isSubmittingOrder = false;
 let isSubmittingPreorder = false;
 
+const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
+
+function normalizeSupabaseUrl(input) {
+  if (!input) return "";
+  let clean = input.trim();
+  const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-z0-9_-]+)/i);
+  if (dashboardMatch && dashboardMatch[1]) {
+    return `https://${dashboardMatch[1]}.supabase.co`;
+  }
+  if (/^[a-z0-9]{20}$/i.test(clean)) {
+    return `https://${clean}.supabase.co`;
+  }
+  if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+    clean = "https://" + clean;
+  }
+  return clean.replace(/\/$/, "");
+}
+
 // Supabase Direct Client Helper (หากมีการตั้งค่า URL และ Anon Key ไว้)
 function getSupabaseConfig() {
-  const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
-  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || "").trim();
+  const rawUrl = localStorage.getItem("SUPABASE_URL") || "";
+  const url = normalizeSupabaseUrl(rawUrl);
+  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || DEFAULT_SUPABASE_KEY).trim();
   if (url && key) {
     return { url, key };
   }

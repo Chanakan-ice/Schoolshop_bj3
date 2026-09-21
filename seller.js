@@ -60,10 +60,29 @@ function getSellerHeaders(custom = {}) {
   return headers;
 }
 
+const DEFAULT_SUPABASE_KEY = "sb_publishable_ez6_m3XM5OQlCovVlwu1wQ_R4DQvQXU";
+
+function normalizeSupabaseUrl(input) {
+  if (!input) return "";
+  let clean = input.trim();
+  const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-z0-9_-]+)/i);
+  if (dashboardMatch && dashboardMatch[1]) {
+    return `https://${dashboardMatch[1]}.supabase.co`;
+  }
+  if (/^[a-z0-9]{20}$/i.test(clean)) {
+    return `https://${clean}.supabase.co`;
+  }
+  if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+    clean = "https://" + clean;
+  }
+  return clean.replace(/\/$/, "");
+}
+
 // Supabase Direct Client Helper
 function getSupabaseConfig() {
-  const url = (localStorage.getItem("SUPABASE_URL") || "").trim().replace(/\/$/, "");
-  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || "").trim();
+  const rawUrl = localStorage.getItem("SUPABASE_URL") || "";
+  const url = normalizeSupabaseUrl(rawUrl);
+  const key = (localStorage.getItem("SUPABASE_ANON_KEY") || DEFAULT_SUPABASE_KEY).trim();
   if (url && key) {
     return { url, key };
   }
@@ -280,7 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const sbKeyInput = document.getElementById("supabaseKeyInput");
   if (sbKeyInput) {
-    sbKeyInput.value = localStorage.getItem("SUPABASE_ANON_KEY") || "";
+    sbKeyInput.value = localStorage.getItem("SUPABASE_ANON_KEY") || DEFAULT_SUPABASE_KEY;
   }
 
   // ซิงก์การตั้งค่า Supabase จากเซิร์ฟเวอร์อัตโนมัติ เพื่อให้ข้ามอุปกรณ์ได้
@@ -1198,8 +1217,9 @@ async function syncProductsToSupabase() {
 
 async function saveCloudSettings() {
   const apiUrl = (document.getElementById("apiUrlInput") ? document.getElementById("apiUrlInput").value : "").trim() || DEFAULT_API_URL;
-  const sbUrl = (document.getElementById("supabaseUrlInput") ? document.getElementById("supabaseUrlInput").value : "").trim();
-  const sbKey = (document.getElementById("supabaseKeyInput") ? document.getElementById("supabaseKeyInput").value : "").trim();
+  const rawSbUrl = (document.getElementById("supabaseUrlInput") ? document.getElementById("supabaseUrlInput").value : "").trim();
+  const sbUrl = normalizeSupabaseUrl(rawSbUrl);
+  const sbKey = (document.getElementById("supabaseKeyInput") ? document.getElementById("supabaseKeyInput").value : "").trim() || DEFAULT_SUPABASE_KEY;
 
   localStorage.setItem("SCHOOLSHOP_API_URL", apiUrl);
   if (sbUrl) localStorage.setItem("SUPABASE_URL", sbUrl);
