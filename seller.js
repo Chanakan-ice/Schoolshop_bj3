@@ -226,16 +226,35 @@ function mergeSellerProducts(remoteList) {
   const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
   baseList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p });
+      map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
     }
   });
 
-  // 2. Custom products ALWAYS take precedence and are NEVER lost on refresh
+  // 2. Custom products take precedence for custom details, but preserve live stock from remote/orders
   customList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p });
+      const existing = map.get(String(p.id));
+      if (existing) {
+        // รักษาค่าสต็อกล่าสุดที่ถูกตัดตามคำสั่งซื้อจริงไว้ ไม่ให้โดนค่าเดิมทับ
+        map.set(String(p.id), {
+          ...p,
+          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0)
+        });
+      } else {
+        map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+      }
     }
   });
+
+  // ซิงก์สต็อกล่าสุดกลับไปยัง customList
+  const updatedCustomList = customList.map(cp => {
+    const live = map.get(String(cp.id));
+    if (live && live.stock !== undefined) {
+      return { ...cp, stock: live.stock };
+    }
+    return cp;
+  });
+  saveCustomProducts(updatedCustomList);
 
   return Array.from(map.values());
 }
@@ -435,6 +454,8 @@ async function loadOrders() {
 
   allOrders = sortDescendingByTime(Array.from(map.values()), "order_id");
   renderOrdersTable(allOrders);
+  renderProductsTable();
+  updateMetrics();
 }
 
 function renderOrdersTable(ordersToDisplay) {
@@ -523,6 +544,45 @@ function filterOrders() {
   }
 }
 
+async function adjustProductStock(productId, delta) {
+  if (!productId || delta === 0) return;
+  const strId = String(productId);
+
+  // 1. อัปเดตใน allProducts
+  const p = allProducts.find(item => String(item.id) === strId);
+  let nextStock = 0;
+  if (p) {
+    p.stock = Math.max(0, (Number(p.stock) || 0) + delta);
+    nextStock = p.stock;
+  }
+
+  // 2. อัปเดตใน Custom Products
+  const customList = getCustomProducts();
+  const cp = customList.find(item => String(item.id) === strId);
+  if (cp) {
+    cp.stock = Math.max(0, (Number(cp.stock) || 0) + delta);
+    if (!p) nextStock = cp.stock;
+    saveCustomProducts(customList);
+  }
+
+  // 3. บันทึกลง LocalStorage
+  localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
+
+  // 4. ซิงก์สต็อกไปยัง Supabase แบบเรียลไทม์
+  const sbConfig = getSupabaseConfig();
+  if (sbConfig) {
+    try {
+      await supabaseFetch(`products?id=eq.${encodeURIComponent(strId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ stock: nextStock })
+      });
+      console.log(`ซิงก์สต็อกสินค้า ${strId} สำเร็จ: สต็อกใหม่คือ ${nextStock}`);
+    } catch (e) {
+      console.warn(`ซิงก์สต็อก Supabase สินค้า ${strId} ขัดข้อง:`, e);
+    }
+  }
+}
+
 async function changeOrderStatus(orderId, newStatus) {
   showToast(`กำลังอัปเดตสถานะเป็น "${newStatus}"...`, "info");
 
@@ -558,12 +618,38 @@ async function changeOrderStatus(orderId, newStatus) {
   // Update in state & LocalStorage
   const found = allOrders.find(o => String(o.order_id) === String(orderId));
   if (found) {
+    const oldStatus = found.status;
     found.status = newStatus;
     localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(allOrders));
+
+    // คืนสต็อกหรือหักสต็อกเมื่อมีการเปลี่ยนสถานะเป็น/จาก "ยกเลิก"
+    let items = [];
+    if (typeof found.items_json === "string") {
+      try { items = JSON.parse(found.items_json); } catch (e) {}
+    } else if (Array.isArray(found.items)) {
+      items = found.items;
+    }
+
+    if (oldStatus !== "ยกเลิก" && newStatus === "ยกเลิก") {
+      // เมื่อยกเลิกออเดอร์ -> คืนสต็อกสินค้ากลับเข้าคลัง
+      for (const itm of items) {
+        if (itm && itm.id) {
+          await adjustProductStock(itm.id, Number(itm.quantity) || 1);
+        }
+      }
+    } else if (oldStatus === "ยกเลิก" && newStatus !== "ยกเลิก") {
+      // เมื่อเปลี่ยนกลับจากยกเลิก -> ตัดสต็อกสินค้าออกอีกครั้ง
+      for (const itm of items) {
+        if (itm && itm.id) {
+          await adjustProductStock(itm.id, -(Number(itm.quantity) || 1));
+        }
+      }
+    }
   }
 
   updateMetrics();
   filterOrders();
+  renderProductsTable();
   showToast("อัปเดตสถานะคำสั่งซื้อเรียบร้อยแล้ว", "success");
 }
 
@@ -625,8 +711,41 @@ function renderProductsTable() {
     return;
   }
 
+  // รวบรวมยอดขาย/จำนวนที่สั่งซื้อตามคำสั่งซื้อจริงที่ไม่ถูกยกเลิก
+  const soldMap = {};
+  allOrders.forEach(order => {
+    if (order && order.status === "ยกเลิก") return;
+    let items = [];
+    if (typeof order.items_json === "string") {
+      try { items = JSON.parse(order.items_json); } catch (e) {}
+    } else if (Array.isArray(order.items)) {
+      items = order.items;
+    }
+    items.forEach(itm => {
+      if (itm && itm.id) {
+        const pid = String(itm.id);
+        soldMap[pid] = (soldMap[pid] || 0) + (Number(itm.quantity) || 1);
+      }
+    });
+  });
+
   tbody.innerHTML = allProducts.map(p => {
     const stock = Number(p.stock) || 0;
+    const soldQty = soldMap[String(p.id)] || 0;
+
+    let stockBadge = "";
+    if (stock <= 0) {
+      stockBadge = `<span class="badge" style="background: #fee2e2; color: #dc2626; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-triangle-exclamation"></i> หมด (0 ชิ้น)</span>`;
+    } else if (stock <= 5) {
+      stockBadge = `<span class="badge" style="background: #fef3c7; color: #d97706; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-clock"></i> เหลือ ${stock} ชิ้น (ใกล้หมด)</span>`;
+    } else {
+      stockBadge = `<span class="badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-boxes-stacked"></i> คงเหลือ ${stock} ชิ้น</span>`;
+    }
+
+    const soldText = soldQty > 0
+      ? `<div style="font-size: 0.78rem; color: #2563eb; font-weight: 600; margin-top: 4px;"><i class="fa-solid fa-cart-shopping"></i> มียอดสั่งซื้อ ${soldQty} ชิ้น</div>`
+      : `<div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;"><i class="fa-regular fa-circle"></i> ยังไม่มียอดสั่งซื้อ</div>`;
+
     return `
       <tr>
         <td><strong>${p.id}</strong></td>
@@ -640,9 +759,8 @@ function renderProductsTable() {
         <td><span class="badge" style="background: var(--primary-light); color: var(--primary-dark);">${p.category}</span></td>
         <td style="font-weight: 600;">${Number(p.price).toLocaleString()} ฿</td>
         <td>
-          <span style="font-weight: bold; ${stock <= 5 ? 'color: var(--danger);' : 'color: var(--success);'}">
-            ${stock} ชิ้น
-          </span>
+          ${stockBadge}
+          ${soldText}
         </td>
         <td>
           <button class="btn btn-secondary" style="padding: 0.35rem 0.7rem; font-size: 0.85rem;" onclick="openEditProductModal('${p.id}')">
