@@ -1542,10 +1542,19 @@ async function handleOrderSubmit(e) {
   // ตรวจสอบสต็อกในเครื่องเบื้องต้นก่อนกดยืนยัน
   for (const itm of orderItems) {
     const p = products.find(prod => String(prod.id) === String(itm.id));
-    if (p && Number(p.stock) < Number(itm.quantity)) {
-      showToast(`ขออภัย สินค้า "${p.name}" เหลือเพียง ${p.stock} ชิ้น ไม่พอสำหรับจำนวนที่สั่ง (${itm.quantity} ชิ้น)`, "error");
-      resetSubmitBtn();
-      return;
+    if (p) {
+      const pStock = Number(p.stock) || 0;
+      const itmQty = Number(itm.quantity) || 1;
+      if (pStock <= 0) {
+        showToast(`ขออภัย สินค้า "${p.name}" หมดสต็อกแล้ว ไม่สามารถทำการสั่งซื้อได้`, "error");
+        resetSubmitBtn();
+        return;
+      }
+      if (pStock < itmQty) {
+        showToast(`ขออภัย สินค้า "${p.name}" เหลือเพียง ${pStock} ชิ้น ไม่พอสำหรับจำนวนที่สั่ง (${itmQty} ชิ้น)`, "error");
+        resetSubmitBtn();
+        return;
+      }
     }
   }
 
@@ -1613,6 +1622,32 @@ async function handleOrderSubmit(e) {
 
     if (sbConfig) {
       try {
+        // ตรวจสอบสต็อกใน Supabase แบบเรียลไทม์ก่อนตัดจริง
+        let remoteStockError = null;
+        for (const item of orderItems) {
+          try {
+            const remoteP = await supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`);
+            if (Array.isArray(remoteP) && remoteP.length > 0) {
+              const curStock = Number(remoteP[0].stock) || 0;
+              const reqQty = Number(item.quantity) || 1;
+              if (curStock <= 0) {
+                remoteStockError = `ขออภัย สินค้า "${remoteP[0].name || item.name}" หมดสต็อกแล้ว ไม่สามารถทำการสั่งซื้อได้`;
+                break;
+              }
+              if (curStock < reqQty) {
+                remoteStockError = `ขออภัย สินค้า "${remoteP[0].name || item.name}" เหลือเพียง ${curStock} ชิ้น ไม่พอสำหรับจำนวนที่สั่ง (${reqQty} ชิ้น)`;
+                break;
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (remoteStockError) {
+          showToast(remoteStockError, "error");
+          resetSubmitBtn();
+          return;
+        }
+
         const orderRecord = {
           order_id: orderId,
           timestamp: orderTime,
@@ -1640,7 +1675,8 @@ async function handleOrderSubmit(e) {
             const remoteP = await supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`);
             if (Array.isArray(remoteP) && remoteP.length > 0) {
               const curStock = Number(remoteP[0].stock) || 0;
-              const nextStock = Math.max(0, curStock - (Number(item.quantity) || 1));
+              const reqQty = Number(item.quantity) || 1;
+              const nextStock = Math.max(0, curStock - reqQty);
               await supabaseFetch(`products?id=eq.${encodeURIComponent(item.id)}`, {
                 method: "PATCH",
                 body: JSON.stringify({ stock: nextStock })
@@ -1657,7 +1693,6 @@ async function handleOrderSubmit(e) {
     }
 
     // 2. ส่งข้อมูลไปยัง Vercel API (/api/shop) เพื่อส่งอีเมลแจ้งเตือนคุณครู/แอดมิน
-    // 2. ส่งข้อมูลไปยัง Vercel API เพื่อบันทึกและส่งอีเมลแจ้งเตือนคุณครู/แอดมิน
     const targetApiUrl = getActiveApiUrl();
     let emailSentViaApi = false;
 
@@ -1671,9 +1706,7 @@ async function handleOrderSubmit(e) {
         const result = await response.json();
         if (result && !result.success) {
           showToast(result.message || "เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง", "error");
-          isSubmittingOrder = false;
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> ยืนยันการสั่งซื้อ';
+          resetSubmitBtn();
           return;
         }
         if (result && result.success) {

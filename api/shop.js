@@ -686,31 +686,57 @@ export default async function handler(req, res) {
         recentSubmissions.set(spamKey, Date.now());
 
         // ตรวจสอบสต็อกสินค้าก่อนตัด (Stock Sufficiency & Concurrency Protection)
-        for (const itm of rawItems) {
-          const reqQty = Math.max(1, Number(itm.quantity) || 1);
-          
-          if (SUPABASE_URL && SUPABASE_KEY) {
-            try {
-              const remoteProds = await supabaseRequest(`products?id=eq.${encodeURIComponent(itm.id)}`);
-              if (remoteProds && remoteProds.length > 0) {
-                const currentStock = Number(remoteProds[0].stock) || 0;
+        // ถ้า body.already_saved === true แสดงว่า app.js ได้ทำการตรวจสอบสต็อกและตัดสต็อกใน Supabase เรียบร้อยแล้ว
+        // ไม่ต้องตรวจสอบซ้ำกับ Supabase อีก เพราะสต็อกเพิ่งถูกตัดไปโดยออเดอร์นี้นั่นเอง (ป้องกันปัญหาขึ้นสินค้าเหลือ 0)
+        let isAlreadySaved = body.already_saved === true;
+        if (!isAlreadySaved && SUPABASE_URL && SUPABASE_KEY) {
+          try {
+            const checkOrder = await supabaseRequest(`orders?order_id=eq.${encodeURIComponent(body.order_id || '')}`);
+            if (checkOrder && checkOrder.length > 0) {
+              isAlreadySaved = true;
+            }
+          } catch (e) {}
+        }
+
+        if (!isAlreadySaved) {
+          for (const itm of rawItems) {
+            const reqQty = Math.max(1, Number(itm.quantity) || 1);
+            
+            if (SUPABASE_URL && SUPABASE_KEY) {
+              try {
+                const remoteProds = await supabaseRequest(`products?id=eq.${encodeURIComponent(itm.id)}`);
+                if (remoteProds && remoteProds.length > 0) {
+                  const currentStock = Number(remoteProds[0].stock) || 0;
+                  if (currentStock <= 0) {
+                    return res.status(400).json({
+                      success: false,
+                      message: `ขออภัย สินค้า "${remoteProds[0].name}" หมดสต็อกแล้ว ไม่สามารถทำการสั่งซื้อได้`
+                    });
+                  }
+                  if (currentStock < reqQty) {
+                    return res.status(400).json({
+                      success: false,
+                      message: `ขออภัย สินค้า "${remoteProds[0].name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
+                    });
+                  }
+                }
+              } catch (e) {}
+            } else {
+              const localProd = memoryProducts.find(p => String(p.id) === String(itm.id));
+              if (localProd) {
+                const currentStock = Number(localProd.stock) || 0;
+                if (currentStock <= 0) {
+                  return res.status(400).json({
+                    success: false,
+                    message: `ขออภัย สินค้า "${localProd.name}" หมดสต็อกแล้ว ไม่สามารถทำการสั่งซื้อได้`
+                  });
+                }
                 if (currentStock < reqQty) {
                   return res.status(400).json({
                     success: false,
-                    message: `ขออภัย สินค้า "${remoteProds[0].name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
+                    message: `ขออภัย สินค้า "${localProd.name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
                   });
                 }
-              }
-            } catch (e) {}
-          } else {
-            const localProd = memoryProducts.find(p => String(p.id) === String(itm.id));
-            if (localProd) {
-              const currentStock = Number(localProd.stock) || 0;
-              if (currentStock < reqQty) {
-                return res.status(400).json({
-                  success: false,
-                  message: `ขออภัย สินค้า "${localProd.name}" มีสินค้าคงเหลือเพียง ${currentStock} ชิ้น ไม่เพียงพอกับจำนวนที่สั่ง (${reqQty} ชิ้น)`
-                });
               }
             }
           }
