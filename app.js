@@ -198,6 +198,19 @@ function saveDeletedProductIds(list) {
   } catch (e) {}
 }
 
+// Helper สำหรับดึงและแยกวันรับของสั่งจองออกจากคำอธิบายสินค้า
+function getPreorderPickupDate(p) {
+  if (p && p.preorder_pickup_date) return p.preorder_pickup_date;
+  if (!p || !p.description) return "";
+  const match = p.description.match(/\[วันรับของจอง:\s*([^\]]+)\]/);
+  return match ? match[1].trim() : "";
+}
+
+function getCleanDescription(desc) {
+  if (!desc) return "";
+  return desc.replace(/\s*\[วันรับของจอง:\s*[^\]]+\]\s*/g, "").trim();
+}
+
 function mergeProducts(remoteList) {
   const customList = getCustomProducts();
   const deletedIds = new Set(getDeletedProductIds());
@@ -207,7 +220,12 @@ function mergeProducts(remoteList) {
   const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
   baseList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+      const preDate = getPreorderPickupDate(p);
+      map.set(String(p.id), {
+        ...p,
+        stock: Number(p.stock) || 0,
+        preorder_pickup_date: preDate
+      });
     }
   });
 
@@ -215,14 +233,20 @@ function mergeProducts(remoteList) {
   customList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
       const existing = map.get(String(p.id));
+      const preDate = getPreorderPickupDate(p) || (existing ? existing.preorder_pickup_date : "");
       if (existing) {
         // รักษาค่าสต็อกล่าสุดจากฐานข้อมูล ไม่ให้ถูกข้อมูลเก่าในเครื่องเขียนทับ
         map.set(String(p.id), {
           ...p,
-          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0)
+          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0),
+          preorder_pickup_date: preDate
         });
       } else {
-        map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+        map.set(String(p.id), {
+          ...p,
+          stock: Number(p.stock) || 0,
+          preorder_pickup_date: preDate
+        });
       }
     }
   });
@@ -231,7 +255,7 @@ function mergeProducts(remoteList) {
   const updatedCustomList = customList.map(cp => {
     const live = map.get(String(cp.id));
     if (live && live.stock !== undefined) {
-      return { ...cp, stock: live.stock };
+      return { ...cp, stock: live.stock, preorder_pickup_date: live.preorder_pickup_date || "" };
     }
     return cp;
   });
@@ -502,6 +526,9 @@ function renderProducts() {
     const isLowStock = stock > 0 && stock <= 5;
     const safeId = encodeURIComponent(String(item.id));
 
+    const cleanDesc = getCleanDescription(item.description);
+    const preorderDate = item.preorder_pickup_date || getPreorderPickupDate(item);
+
     return `
       <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''}" data-product-id="${safeId}" onclick="viewProductDetail('${safeId}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียด">
         <div class="product-image-wrap">
@@ -512,7 +539,8 @@ function renderProducts() {
         </div>
         <div class="product-body">
           <h3 class="product-title">${item.name}</h3>
-          <p class="product-desc">${item.description || '-'}</p>
+          <p class="product-desc">${cleanDesc || '-'}</p>
+          ${preorderDate ? `<div style="font-size: 0.78rem; color: #7c3aed; font-weight: 600; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 4px;"><i class="fa-regular fa-calendar-days"></i> วันรับของจอง: ${preorderDate}</div>` : ''}
           
           <div class="product-footer" style="${isOutOfStock ? 'flex-direction: column; align-items: stretch; gap: 0.65rem;' : ''}">
             <div style="${isOutOfStock ? 'display: flex; justify-content: space-between; align-items: center;' : ''}">
@@ -623,8 +651,18 @@ function viewProductDetail(productId, pushHistory = true) {
 
         <div class="detail-section">
           <div class="detail-section-title"><i class="fa-solid fa-circle-info"></i> รายละเอียดสินค้า & ผลงาน</div>
-          <div class="detail-desc">${prod.description ? prod.description.replace(/\n/g, '<br>') : 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
+          <div class="detail-desc">${(getCleanDescription(prod.description) || '').replace(/\n/g, '<br>') || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
         </div>
+
+        ${(prod.preorder_pickup_date || getPreorderPickupDate(prod)) ? `
+        <div class="detail-section" style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+          <div class="detail-section-title" style="color: #6d28d9; margin-bottom: 0.35rem;"><i class="fa-regular fa-calendar-days"></i> วันที่นัดรับของสั่งจอง (Pre-order)</div>
+          <div style="font-size: 0.95rem; color: #5b21b6; font-weight: 600;">
+            ${prod.preorder_pickup_date || getPreorderPickupDate(prod)}
+          </div>
+          <div style="font-size: 0.8rem; color: #7c3aed; margin-top: 4px;">* สำหรับผู้ที่กดสั่งจองสินค้าล่วงหน้า จะได้รับสินค้าตามกำหนดการนี้</div>
+        </div>
+        ` : ''}
 
         <div class="detail-section">
           <div class="detail-section-title"><i class="fa-solid fa-location-dot"></i> การรับสินค้า & ชำระเงิน</div>
@@ -2056,9 +2094,33 @@ async function searchOrders() {
 }
 
 // ==================== Preorder & Contact Forms ====================
+function updatePreorderPickupNotice(prodName) {
+  const noticeEl = document.getElementById("preorderPickupNotice");
+  const textEl = document.getElementById("preorderPickupNoticeText");
+  if (!noticeEl || !textEl) return;
+  
+  if (!prodName) {
+    noticeEl.style.display = "none";
+    return;
+  }
+  
+  const trimmed = prodName.trim().toLowerCase();
+  const matched = products.find(p => p.name.trim().toLowerCase() === trimmed || (trimmed.length > 2 && p.name.trim().toLowerCase().includes(trimmed)));
+  const preDate = matched ? (matched.preorder_pickup_date || getPreorderPickupDate(matched)) : "";
+  
+  if (preDate) {
+    textEl.innerText = preDate;
+    noticeEl.style.display = "block";
+  } else {
+    noticeEl.style.display = "none";
+  }
+}
+window.updatePreorderPickupNotice = updatePreorderPickupNotice;
+
 function openPreorderModal() {
   document.getElementById("preorderForm").reset();
   switchPreorderBuyerType("student");
+  updatePreorderPickupNotice("");
   handleNotifyChannelChange();
   autoFillPreorderCustomerData();
   document.getElementById("preorderModal").classList.add("active");
@@ -2070,6 +2132,7 @@ function openPreorderForProduct(productNameEncoded) {
   switchPreorderBuyerType("student");
   const nameInput = document.getElementById("preProdName");
   if (nameInput) nameInput.value = prodName;
+  updatePreorderPickupNotice(prodName);
   handleNotifyChannelChange();
   autoFillPreorderCustomerData();
   document.getElementById("preorderModal").classList.add("active");

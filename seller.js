@@ -217,6 +217,19 @@ function generateUniqueProductId() {
   return `P${ts}_${rand}`;
 }
 
+// Helper สำหรับดึงและแยกวันรับของสั่งจองออกจากคำอธิบายสินค้า
+function getPreorderPickupDate(p) {
+  if (p && p.preorder_pickup_date) return p.preorder_pickup_date;
+  if (!p || !p.description) return "";
+  const match = p.description.match(/\[วันรับของจอง:\s*([^\]]+)\]/);
+  return match ? match[1].trim() : "";
+}
+
+function getCleanDescription(desc) {
+  if (!desc) return "";
+  return desc.replace(/\s*\[วันรับของจอง:\s*[^\]]+\]\s*/g, "").trim();
+}
+
 function mergeSellerProducts(remoteList) {
   const customList = getCustomProducts();
   const deletedIds = new Set(getDeletedProductIds());
@@ -226,7 +239,12 @@ function mergeSellerProducts(remoteList) {
   const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
   baseList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+      const preDate = getPreorderPickupDate(p);
+      map.set(String(p.id), {
+        ...p,
+        stock: Number(p.stock) || 0,
+        preorder_pickup_date: preDate
+      });
     }
   });
 
@@ -234,14 +252,20 @@ function mergeSellerProducts(remoteList) {
   customList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
       const existing = map.get(String(p.id));
+      const preDate = getPreorderPickupDate(p) || (existing ? existing.preorder_pickup_date : "");
       if (existing) {
         // รักษาค่าสต็อกล่าสุดที่ถูกตัดตามคำสั่งซื้อจริงไว้ ไม่ให้โดนค่าเดิมทับ
         map.set(String(p.id), {
           ...p,
-          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0)
+          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0),
+          preorder_pickup_date: preDate
         });
       } else {
-        map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+        map.set(String(p.id), {
+          ...p,
+          stock: Number(p.stock) || 0,
+          preorder_pickup_date: preDate
+        });
       }
     }
   });
@@ -250,7 +274,7 @@ function mergeSellerProducts(remoteList) {
   const updatedCustomList = customList.map(cp => {
     const live = map.get(String(cp.id));
     if (live && live.stock !== undefined) {
-      return { ...cp, stock: live.stock };
+      return { ...cp, stock: live.stock, preorder_pickup_date: live.preorder_pickup_date || "" };
     }
     return cp;
   });
@@ -464,15 +488,15 @@ async function loadOrders(silent = false) {
     }
   }
 
-  const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
-  const map = new Map();
-  [...apiOrders, ...localOrders].forEach(o => {
-    if (o && o.order_id && !map.has(o.order_id)) {
-      map.set(o.order_id, o);
-    }
-  });
+  // ใช้ข้อมูลคำสั่งซื้อจริงจาก Supabase/Cloud เพื่อให้ยอดขายและคำสั่งซื้อทุกเครื่องตรงกัน 100%
+  if (Array.isArray(apiOrders) && apiOrders.length > 0) {
+    allOrders = sortDescendingByTime(apiOrders, "order_id");
+    localStorage.setItem("SCHOOLSHOP_ORDERS", JSON.stringify(allOrders));
+  } else {
+    const localOrders = JSON.parse(localStorage.getItem("SCHOOLSHOP_ORDERS") || "[]");
+    allOrders = sortDescendingByTime(localOrders, "order_id");
+  }
 
-  allOrders = sortDescendingByTime(Array.from(map.values()), "order_id");
   renderOrdersTable(allOrders);
   renderProductsTable();
   updateMetrics();
@@ -776,7 +800,8 @@ function renderProductsTable() {
           <div style="font-weight: 600; ${stock <= 0 ? 'color: #b91c1c;' : ''}">
             ${p.name} ${stock <= 0 ? '<span class="badge" style="background: #ef4444; color: #ffffff; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; margin-left: 4px; border-radius: 4px;"><i class="fa-solid fa-circle-xmark"></i> สินค้าหมด</span>' : ''}
           </div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">${p.description || '-'}</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">${getCleanDescription(p.description) || '-'}</div>
+          ${(p.preorder_pickup_date || getPreorderPickupDate(p)) ? `<div style="font-size: 0.78rem; color: #7c3aed; font-weight: 600; margin-top: 3px;"><i class="fa-regular fa-calendar-days"></i> วันนัดรับของจอง: ${p.preorder_pickup_date || getPreorderPickupDate(p)}</div>` : ''}
         </td>
         <td><span class="badge" style="background: var(--primary-light); color: var(--primary-dark);">${p.category}</span></td>
         <td style="font-weight: 600;">${Number(p.price).toLocaleString()} ฿</td>
@@ -835,15 +860,15 @@ async function loadPreorders() {
     }
   }
 
-  const localPreorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
-  const map = new Map();
-  [...apiPreorders, ...localPreorders].forEach(p => {
-    if (p && p.preorder_id && !map.has(p.preorder_id)) {
-      map.set(p.preorder_id, p);
-    }
-  });
+  // ใช้ข้อมูลการสั่งจองจริงจาก Supabase/Cloud เพื่อให้ทุกเครื่องตรงกัน 100%
+  if (Array.isArray(apiPreorders) && apiPreorders.length > 0) {
+    allPreorders = sortDescendingByTime(apiPreorders, "preorder_id");
+    localStorage.setItem("SCHOOLSHOP_PREORDERS", JSON.stringify(allPreorders));
+  } else {
+    const localPreorders = JSON.parse(localStorage.getItem("SCHOOLSHOP_PREORDERS") || "[]");
+    allPreorders = sortDescendingByTime(localPreorders, "preorder_id");
+  }
 
-  allPreorders = sortDescendingByTime(Array.from(map.values()), "preorder_id");
   renderPreordersTable();
   updatePreorderBadge();
 }
@@ -1197,6 +1222,8 @@ function openAddProductModal() {
   document.getElementById("productModalTitle").innerHTML = '<i class="fa-solid fa-box-open"></i> เพิ่มสินค้าใหม่';
   document.getElementById("productForm").reset();
   document.getElementById("editProductId").value = "";
+  const preDateInput = document.getElementById("prodPreorderDateInput");
+  if (preDateInput) preDateInput.value = "";
   removeProductImage();
   document.getElementById("productModal").classList.add("active");
 }
@@ -1211,7 +1238,10 @@ function openEditProductModal(productId) {
   document.getElementById("prodCatInput").value = prod.category;
   document.getElementById("prodPriceInput").value = prod.price;
   document.getElementById("prodStockInput").value = prod.stock;
-  document.getElementById("prodDescInput").value = prod.description || "";
+  const preDate = prod.preorder_pickup_date || getPreorderPickupDate(prod) || "";
+  const preDateInput = document.getElementById("prodPreorderDateInput");
+  if (preDateInput) preDateInput.value = preDate;
+  document.getElementById("prodDescInput").value = getCleanDescription(prod.description) || "";
 
   if (prod.image_url) {
     uploadedProductImageDataUrl = prod.image_url;
@@ -1245,7 +1275,13 @@ async function handleProductFormSubmit(e) {
   const category = document.getElementById("prodCatInput").value;
   const price = Number(document.getElementById("prodPriceInput").value);
   const stock = Number(document.getElementById("prodStockInput").value);
-  const description = document.getElementById("prodDescInput").value.trim();
+  const rawPreDate = document.getElementById("prodPreorderDateInput") ? document.getElementById("prodPreorderDateInput").value.trim() : "";
+  let rawDesc = document.getElementById("prodDescInput").value.trim();
+  rawDesc = getCleanDescription(rawDesc);
+  let finalDesc = rawDesc;
+  if (rawPreDate) {
+    finalDesc = (rawDesc ? rawDesc + "\n" : "") + `[วันรับของจอง: ${rawPreDate}]`;
+  }
 
   if (!name || name.length < 2) {
     showToast("กรุณาระบุชื่อสินค้าอย่างน้อย 2 ตัวอักษร", "error");
@@ -1270,7 +1306,8 @@ async function handleProductFormSubmit(e) {
     price: price,
     stock: stock,
     image_url: finalImage,
-    description: description
+    description: finalDesc,
+    preorder_pickup_date: rawPreDate
   };
 
   showToast("กำลังบันทึกสินค้า...", "info");
@@ -1298,19 +1335,28 @@ async function handleProductFormSubmit(e) {
   }
   localStorage.setItem("SCHOOLSHOP_LOCAL_PRODUCTS", JSON.stringify(allProducts));
 
-  // 2. ส่งตรงไป Supabase หากเชื่อมต่อไว้
+  // 2. ส่งตรงไป Supabase หากเชื่อมต่อไว้ (ใช้ schema คอลัมน์มาตรฐานเพื่อป้องกันข้อผิดพลาด)
   try {
     const sbConfig = getSupabaseConfig();
     if (sbConfig) {
+      const sbPayload = {
+        id: data.id,
+        name: data.name,
+        category: data.category,
+        price: data.price,
+        stock: data.stock,
+        image_url: data.image_url,
+        description: data.description
+      };
       if (id) {
         await supabaseFetch(`products?id=eq.${encodeURIComponent(id)}`, {
           method: "PATCH",
-          body: JSON.stringify(data)
+          body: JSON.stringify(sbPayload)
         });
       } else {
         await supabaseFetch("products", {
           method: "POST",
-          body: JSON.stringify(data)
+          body: JSON.stringify(sbPayload)
         });
       }
     }

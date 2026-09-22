@@ -403,7 +403,10 @@
         <form id="preorderForm" onsubmit="handlePreorderSubmit(event)">
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-box"></i> ชื่อสินค้าที่ต้องการสั่งจอง *</label>
-            <input type="text" id="preProdName" list="shopProductsList" class="form-input" placeholder="คลิกเพื่อเลือกสินค้า หรือพิมพ์ชื่อสินค้าที่ต้องการ..." required>
+            <input type="text" id="preProdName" list="shopProductsList" class="form-input" placeholder="คลิกเพื่อเลือกสินค้า หรือพิมพ์ชื่อสินค้าที่ต้องการ..." oninput="updatePreorderPickupNotice(this.value)" required>
+            <div id="preorderPickupNotice" style="display: none; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 0.6rem 0.85rem; margin-top: 6px; font-size: 0.85rem; color: #5b21b6;">
+              <i class="fa-regular fa-calendar-check" style="color: #7c3aed; margin-right: 4px;"></i> <strong>กำหนดวันนัดรับสินค้านี้:</strong> <span id="preorderPickupNoticeText"></span>
+            </div>
             <datalist id="shopProductsList">
               <option value="คุกกี้เนยสด ช็อกโกแลตชิพ (35฿)"></option>
               <option value="ผักสลัดไฮโดรโปนิกส์ ปลอดสารเคมี (30฿)"></option>
@@ -766,6 +769,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js?v=5.0"></script>
+  <script src="app.js?v=5.1"></script>
 </body>
 </html>

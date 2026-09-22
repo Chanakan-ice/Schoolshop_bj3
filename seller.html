@@ -395,6 +395,12 @@
             <input type="number" id="prodStockInput" class="form-input" min="0" placeholder="50" required>
           </div>
 
+          <div class="form-group">
+            <label class="form-label"><i class="fa-regular fa-calendar-days"></i> วันที่นัดรับของสั่งจอง (สำหรับสินค้าพรีออเดอร์)</label>
+            <input type="text" id="prodPreorderDateInput" class="form-input" placeholder="เช่น 25 ก.ย. 2569, ทุกวันศุกร์, หรือ 1-2 วันหลังสั่ง">
+            <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;">* ระบุวันที่หรือระยะเวลานัดรับสินค้าเมื่อลูกค้าสั่งจองล่วงหน้า</span>
+          </div>
+
           <!-- Direct Device Image Upload Dropzone -->
           <div class="form-group">
             <label class="form-label"><i class="fa-solid fa-image"></i> รูปภาพสินค้า *</label>
@@ -567,6 +573,6 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="seller.js?v=4.9"></script>
+  <script src="seller.js?v=5.1"></script>
 </body>
 </html>
