@@ -191,20 +191,39 @@ function mergeProducts(remoteList) {
   const deletedIds = new Set(getDeletedProductIds());
   const map = new Map();
 
-  // 1. นำเข้ารายการจาก Remote หรือ Mock ที่ไม่เคยถูกลบ
+  // 1. นำเข้ารายการจาก Remote หรือ Mock ที่ไม่เคยถูกลบ (ดึงค่าสต็อกจริงล่าสุด)
   const baseList = (Array.isArray(remoteList) && remoteList.length > 0) ? remoteList : DEFAULT_PRODUCTS;
   baseList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p });
+      map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
     }
   });
 
-  // 2. รวมรายการ Custom Products ที่เพิ่มไว้ในเครื่องเสมอ (ไม่โดนเขียนทับแน่นอน)
+  // 2. รวมรายการ Custom Products โดยรักษาค่าสต็อกล่าสุด (โดยเฉพาะเมื่อสินค้าหมด = 0)
   customList.forEach(p => {
     if (p && p.id && !deletedIds.has(String(p.id))) {
-      map.set(String(p.id), { ...p });
+      const existing = map.get(String(p.id));
+      if (existing) {
+        // รักษาค่าสต็อกล่าสุดจากฐานข้อมูล ไม่ให้ถูกข้อมูลเก่าในเครื่องเขียนทับ
+        map.set(String(p.id), {
+          ...p,
+          stock: existing.stock !== undefined ? Number(existing.stock) : (Number(p.stock) || 0)
+        });
+      } else {
+        map.set(String(p.id), { ...p, stock: Number(p.stock) || 0 });
+      }
     }
   });
+
+  // ซิงก์สต็อกล่าสุดกลับไปยัง customList เพื่อให้ทุกเครื่องตรงกัน
+  const updatedCustomList = customList.map(cp => {
+    const live = map.get(String(cp.id));
+    if (live && live.stock !== undefined) {
+      return { ...cp, stock: live.stock };
+    }
+    return cp;
+  });
+  saveCustomProducts(updatedCustomList);
 
   return Array.from(map.values());
 }
@@ -239,6 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCartBadge();
   initCustomerAuth();
   handleUrlHash();
+  startBuyerAutoSync();
 });
 
 function initEventListeners() {
@@ -302,9 +322,9 @@ async function syncStoreConfig() {
 }
 
 // ==================== Fetch Products ====================
-async function loadProducts() {
+async function loadProducts(silent = false) {
   const countEl = document.getElementById("productCount");
-  if (countEl && products.length === 0) countEl.innerText = "กำลังโหลดข้อมูล...";
+  if (!silent && countEl && products.length === 0) countEl.innerText = "กำลังโหลดข้อมูล...";
 
   let fetchedProducts = null;
 
@@ -314,7 +334,7 @@ async function loadProducts() {
     sbConfig = await syncStoreConfig();
   }
 
-  // 2. ลองดึงจาก Supabase โดยตรงหากมี config
+  // 2. ลองดึงจาก Supabase โดยตรงหากมี config (เรียลไทม์ข้ามอุปกรณ์ 100%)
   if (sbConfig) {
     try {
       const data = await supabaseFetch("products?select=*&order=created_at.desc");
@@ -341,7 +361,7 @@ async function loadProducts() {
     }
   }
 
-  // 3. รวมสินค้า Remote กับ Custom Products ที่บันทึกไว้ในเครื่องเสมอ ป้องกันสินค้ารีเฟรชแล้วหาย 100%
+  // 3. รวมสินค้า Remote กับ Custom Products ที่บันทึกไว้ในเครื่องเสมอ
   const savedLocal = localStorage.getItem("SCHOOLSHOP_LOCAL_PRODUCTS");
   let localList = [];
   if (savedLocal) {
@@ -357,7 +377,7 @@ async function loadProducts() {
 
   renderProducts();
 
-  // หากอยู่ในหน้า Detail ให้คงการแสดงผลสินค้ารายการเดิมไว้ ไม่ให้เปลี่ยนหรือรีเซ็ต
+  // หากอยู่ในหน้า Detail ให้รีเฟรชการแสดงผลสินค้ารายการเดิมตามสต็อกล่าสุด
   const hash = window.location.hash || "";
   if (hash.startsWith("#product-")) {
     const pId = decodeURIComponent(hash.replace("#product-", ""));
@@ -366,7 +386,30 @@ async function loadProducts() {
       viewProductDetail(pId, false);
     }
   }
+
+  // หากเปิดหน้าต่างตะกร้าสินค้าอยู่ ให้รีเฟรชสถานะสินค้าหมดในตะกร้าทันที
+  const cartModal = document.getElementById("cartModal");
+  if (cartModal && (cartModal.classList.contains("show") || cartModal.style.display === "block" || cartModal.style.display === "flex")) {
+    renderCartModal();
+  }
 }
+
+// ระบบอัปเดตสต็อกเรียลไทม์ทุกเครื่องผู้ซื้อ (Real-time Cross-device Auto Sync)
+let buyerSyncInterval = null;
+function startBuyerAutoSync() {
+  if (buyerSyncInterval) clearInterval(buyerSyncInterval);
+  buyerSyncInterval = setInterval(async () => {
+    try {
+      await loadProducts(true);
+    } catch (e) {}
+  }, 8000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    loadProducts(true);
+  }
+});
 
 // ==================== Render Products Grid ====================
 function renderProducts() {
@@ -600,9 +643,13 @@ function addCurrentProductToCart(productId) {
   const prod = products.find(p => String(p.id) === String(productId));
   if (!prod) return;
 
-  const qtyInput = document.getElementById("detailQtyInput");
-  const qty = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
   const currentStock = Number(prod.stock) || 0;
+  if (currentStock <= 0) {
+    showToast(`ขออภัย สินค้า "${prod.name}" หมดสต็อกแล้ว (เปิดรับจองล่วงหน้า)`, "warning");
+    renderProducts();
+    openPreorderForProduct(prod.name);
+    return;
+  }
 
   const existingIndex = cart.findIndex(c => String(c.id) === String(productId));
   if (existingIndex > -1) {
@@ -1132,6 +1179,13 @@ function addToCart(productId) {
   if (!prod) return;
 
   const currentStock = Number(prod.stock) || 0;
+  if (currentStock <= 0) {
+    showToast(`ขออภัย สินค้า "${prod.name}" หมดสต็อกแล้ว (เปิดรับจองล่วงหน้า)`, "warning");
+    renderProducts();
+    openPreorderForProduct(prod.name);
+    return;
+  }
+
   const existingIndex = cart.findIndex(c => String(c.id) === String(productId));
 
   if (existingIndex > -1) {
@@ -1141,10 +1195,6 @@ function addToCart(productId) {
     }
     cart[existingIndex].quantity += 1;
   } else {
-    if (currentStock <= 0) {
-      showToast("สินค้านี้หมดแล้ว", "error");
-      return;
-    }
     cart.push({
       id: prod.id,
       name: prod.name,

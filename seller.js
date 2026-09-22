@@ -329,6 +329,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (window.location.pathname.includes("seller") || window.location.search.includes("view=seller")) {
     checkAdminAuth();
   }
+
+  // เริ่มระบบซิงก์ข้อมูลอัตโนมัติทุกเครื่องผู้ขาย (Real-time Cross-device Auto Sync)
+  startSellerAutoSync();
 });
 
 // ==================== Tab Switching ====================
@@ -345,16 +348,33 @@ function switchTab(tabId, element) {
 }
 
 // ==================== Refresh & Load Data ====================
-async function refreshAllData() {
-  showToast("กำลังโหลดข้อมูลล่าสุด...", "info");
+async function refreshAllData(silent = false) {
+  if (!silent) showToast("กำลังโหลดข้อมูลล่าสุด...", "info");
   await Promise.all([
-    loadOrders(),
-    loadSellerProducts(),
-    loadPreorders(),
-    loadMessages()
+    loadOrders(silent),
+    loadSellerProducts(silent),
+    loadPreorders(silent),
+    loadMessages(silent)
   ]);
   updateMetrics();
 }
+
+// ระบบอัปเดตคำสั่งซื้อและสต็อกเรียลไทม์ทุกเครื่องผู้ขาย
+let sellerSyncInterval = null;
+function startSellerAutoSync() {
+  if (sellerSyncInterval) clearInterval(sellerSyncInterval);
+  sellerSyncInterval = setInterval(async () => {
+    try {
+      await refreshAllData(true);
+    } catch (e) {}
+  }, 8000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    refreshAllData(true);
+  }
+});
 
 function sortDescendingByTime(list, idKey = "order_id") {
   return list.sort((a, b) => {
@@ -406,7 +426,7 @@ function formatThaiDateTime(dateVal, fallback = "-") {
 }
 
 // 1. Orders
-async function loadOrders() {
+async function loadOrders(silent = false) {
   let apiOrders = [];
 
   // ลองดึงจาก Supabase โดยตรงก่อน (เรียลไทม์และรวดเร็วข้ามอุปกรณ์)
@@ -654,7 +674,7 @@ async function changeOrderStatus(orderId, newStatus) {
 }
 
 // 2. Products
-async function loadSellerProducts() {
+async function loadSellerProducts(silent = false) {
   let fetchedProducts = null;
 
   // 1. ลองดึงจาก Supabase โดยตรงหากมี config
@@ -735,7 +755,7 @@ function renderProductsTable() {
 
     let stockBadge = "";
     if (stock <= 0) {
-      stockBadge = `<span class="badge" style="background: #fee2e2; color: #dc2626; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-triangle-exclamation"></i> หมด (0 ชิ้น)</span>`;
+      stockBadge = `<span class="badge" style="background: #fee2e2; color: #b91c1c; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-circle-xmark"></i> สินค้าหมดสต็อก (0 ชิ้น)</span>`;
     } else if (stock <= 5) {
       stockBadge = `<span class="badge" style="background: #fef3c7; color: #d97706; font-weight: 700; font-size: 0.82rem; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-clock"></i> เหลือ ${stock} ชิ้น (ใกล้หมด)</span>`;
     } else {
@@ -747,13 +767,15 @@ function renderProductsTable() {
       : `<div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;"><i class="fa-regular fa-circle"></i> ยังไม่มียอดสั่งซื้อ</div>`;
 
     return `
-      <tr>
+      <tr style="${stock <= 0 ? 'background-color: #fff5f5;' : ''}">
         <td><strong>${p.id}</strong></td>
         <td>
-          <img src="${p.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="" style="width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius-sm);">
+          <img src="${p.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500'}" alt="" style="width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius-sm); ${stock <= 0 ? 'filter: grayscale(40%); opacity: 0.85;' : ''}">
         </td>
         <td>
-          <div style="font-weight: 600;">${p.name}</div>
+          <div style="font-weight: 600; ${stock <= 0 ? 'color: #b91c1c;' : ''}">
+            ${p.name} ${stock <= 0 ? '<span class="badge" style="background: #ef4444; color: #ffffff; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; margin-left: 4px; border-radius: 4px;"><i class="fa-solid fa-circle-xmark"></i> สินค้าหมด</span>' : ''}
+          </div>
           <div style="font-size: 0.8rem; color: var(--text-muted);">${p.description || '-'}</div>
         </td>
         <td><span class="badge" style="background: var(--primary-light); color: var(--primary-dark);">${p.category}</span></td>
@@ -1430,8 +1452,13 @@ function updateMetrics() {
   }
 
   if (lowStockEl) {
-    const lowCount = allProducts.filter(p => Number(p.stock) <= 5).length;
-    lowStockEl.innerText = lowCount;
+    const outCount = allProducts.filter(p => Number(p.stock) <= 0).length;
+    const lowCount = allProducts.filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5).length;
+    if (outCount > 0) {
+      lowStockEl.innerHTML = `<span style="color: #dc2626; font-weight: 700;">${outCount} หมดสต็อก</span> <span style="font-size: 0.8rem; color: #d97706; font-weight: normal;">(${lowCount} ใกล้หมด)</span>`;
+    } else {
+      lowStockEl.innerText = `${lowCount} รายการ`;
+    }
   }
 }
 
