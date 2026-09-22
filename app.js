@@ -177,6 +177,12 @@ function getCustomProducts() {
   }
 }
 
+function saveCustomProducts(list) {
+  try {
+    localStorage.setItem("SCHOOLSHOP_CUSTOM_PRODUCTS", JSON.stringify(list || []));
+  } catch (e) {}
+}
+
 function getDeletedProductIds() {
   try {
     const data = JSON.parse(localStorage.getItem("SCHOOLSHOP_DELETED_PRODUCT_IDS") || "[]");
@@ -184,6 +190,12 @@ function getDeletedProductIds() {
   } catch (e) {
     return [];
   }
+}
+
+function saveDeletedProductIds(list) {
+  try {
+    localStorage.setItem("SCHOOLSHOP_DELETED_PRODUCT_IDS", JSON.stringify(list || []));
+  } catch (e) {}
 }
 
 function mergeProducts(remoteList) {
