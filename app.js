@@ -395,7 +395,12 @@ async function loadProducts(silent = false) {
     const pId = decodeURIComponent(hash.replace("#product-", ""));
     const currentDetail = products.find(p => String(p.id) === pId);
     if (currentDetail) {
-      viewProductDetail(pId, false);
+      if (!silent) {
+        viewProductDetail(pId, false);
+      } else {
+        // เมื่อทำงานในพื้นหลัง (Silent) ให้อัปเดตเฉพาะสต็อก ไม่รีเซ็ตจำนวนที่ผู้ซื้อกำลังกดเลือกอยู่
+        updateDetailStockInPlace(currentDetail);
+      }
     }
   }
 
@@ -403,6 +408,39 @@ async function loadProducts(silent = false) {
   const cartModal = document.getElementById("cartModal");
   if (cartModal && (cartModal.classList.contains("show") || cartModal.style.display === "block" || cartModal.style.display === "flex")) {
     renderCartModal();
+  }
+}
+
+// อัปเดตสต็อกในหน้ารายละเอียดแบบคงค่าจำนวนที่ผู้ซื้อกำลังกดเลือกไว้
+function updateDetailStockInPlace(prod) {
+  if (!prod) return;
+  const stock = Number(prod.stock) || 0;
+  const isOutOfStock = stock <= 0;
+
+  const existingBadge = document.querySelector(".detail-stock-badge");
+  const wasOutOfStock = existingBadge && existingBadge.classList.contains("out");
+  // ถ้าเปลี่ยนสถานะระหว่าง มีของ <-> หมดสต็อก ให้สลับหน้าตาปุ่มสั่งซื้อ/สั่งจอง
+  if (isOutOfStock !== wasOutOfStock) {
+    viewProductDetail(prod.id, false);
+    return;
+  }
+
+  if (existingBadge) {
+    const isLowStock = stock > 0 && stock <= 5;
+    const stockClass = isOutOfStock ? "out" : (isLowStock ? "low" : "in");
+    existingBadge.className = `detail-stock-badge ${stockClass}`;
+    existingBadge.innerHTML = isOutOfStock
+      ? '<i class="fa-solid fa-circle-xmark"></i> สินค้าหมดชั่วคราว (เปิดรับจองล่วงหน้า)'
+      : (isLowStock ? `<i class="fa-solid fa-triangle-exclamation"></i> ใกล้หมด เหลือเพียง ${stock} ชิ้น` : `<i class="fa-solid fa-boxes-stacked"></i> สต็อกพร้อมส่ง: ${stock} ชิ้น`);
+  }
+
+  const qtyInput = document.getElementById("detailQtyInput");
+  if (qtyInput) {
+    qtyInput.max = stock;
+    const curVal = parseInt(qtyInput.value) || 1;
+    if (curVal > stock) {
+      qtyInput.value = Math.max(1, stock);
+    }
   }
 }
 
@@ -414,7 +452,7 @@ function startBuyerAutoSync() {
     try {
       await loadProducts(true);
     } catch (e) {}
-  }, 8000);
+  }, 12000);
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -546,6 +584,10 @@ function viewProductDetail(productId, pushHistory = true) {
     ? '<i class="fa-solid fa-circle-xmark"></i> สินค้าหมดชั่วคราว (เปิดรับจองล่วงหน้า)'
     : (isLowStock ? `<i class="fa-solid fa-triangle-exclamation"></i> ใกล้หมด เหลือเพียง ${stock} ชิ้น` : `<i class="fa-solid fa-boxes-stacked"></i> สต็อกพร้อมส่ง: ${stock} ชิ้น`);
 
+  const existingQtyInput = document.getElementById("detailQtyInput");
+  const preservedQty = existingQtyInput ? (parseInt(existingQtyInput.value) || 1) : 1;
+  const initialQty = Math.max(1, Math.min(preservedQty, stock > 0 ? stock : 1));
+
   detailContainer.innerHTML = `
     <button class="btn btn-secondary detail-back-btn" onclick="closeProductDetail()">
       <i class="fa-solid fa-arrow-left"></i> กลับหน้ารายการสินค้า
@@ -598,7 +640,7 @@ function viewProductDetail(productId, pushHistory = true) {
             <label class="detail-qty-label">จำนวนที่ต้องการสั่งซื้อ:</label>
             <div class="qty-counter">
               <button type="button" class="qty-counter-btn" onclick="changeDetailQty(-1, ${stock})">-</button>
-              <input type="number" id="detailQtyInput" class="qty-counter-input" value="1" min="1" max="${stock}" readonly>
+              <input type="number" id="detailQtyInput" class="qty-counter-input" value="${initialQty}" min="1" max="${stock}" readonly>
               <button type="button" class="qty-counter-btn" onclick="changeDetailQty(1, ${stock})">+</button>
             </div>
             <span style="font-size: 0.85rem; color: var(--text-muted);">(มีจำหน่าย ${stock} ชิ้น)</span>
